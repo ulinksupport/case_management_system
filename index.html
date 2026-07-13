@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ulink Assist Case Storyboard MVP dashboard." />
+  <title>Ulink Assist | Case Storyboard MVP</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">UA</div>
+        <div>
+          <div class="brand-name">Ulink Assist</div>
+          <div class="brand-subtitle">Case Storyboard MVP</div>
+        </div>
+      </div>
+
+      <div class="nav-label">Workspace</div>
+      <nav class="nav-list" aria-label="Main navigation">
+        <button class="nav-item active" data-view="cases" type="button">
+          <span class="nav-icon">▦</span>
+          <span class="nav-text">Master Cases</span>
+          <span class="nav-count" id="navCaseCount">0</span>
+        </button>
+        <button class="nav-item" data-view="unmatched" type="button">
+          <span class="nav-icon">?</span>
+          <span class="nav-text">Unmatched</span>
+          <span class="nav-count" id="navUnmatchedCount">0</span>
+        </button>
+        <button class="nav-item" data-view="ingestion" type="button">
+          <span class="nav-icon">⇅</span>
+          <span class="nav-text">Ingestion Status</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>Read-only MVP</strong>
+        Email and WhatsApp are grouped into one Master Case. AI content is for reference only.
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="mobile-menu" id="menuButton" type="button" aria-label="Open navigation">☰</button>
+        <div class="global-search-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="globalSearch" type="search" placeholder="Search case ID, patient, email, phone or ticket..." />
+        </div>
+        <div class="topbar-spacer"></div>
+        <span class="environment-badge">MVP Demo</span>
+        <span class="readonly-badge">Read-only</span>
+        <div class="avatar" title="Operations User">OP</div>
+      </header>
+
+      <div class="content">
+        <section class="view active" id="view-cases">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CASE OVERVIEW</p>
+              <h1>Master Cases</h1>
+              <p class="page-description">Open one case to view all linked emails, WhatsApp messages, tickets and AI guidance in a single timeline.</p>
+            </div>
+            <div class="last-updated">Last refreshed<br /><strong id="lastUpdatedText">—</strong></div>
+          </div>
+
+          <div class="notice">
+            <span class="notice-icon">i</span>
+            <div><strong>MVP scope:</strong> Data is displayed only. Replies, ticket updates and external actions remain outside the Storyboard.</div>
+          </div>
+
+          <div class="kpi-grid" id="kpiGrid"></div>
+
+          <div class="overview-grid">
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Recently Updated</h2>
+                  <p>Latest matched activity across connected channels</p>
+                </div>
+              </div>
+              <div class="recent-list" id="recentCases"></div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Source Health</h2>
+                  <p>Current MVP connection status</p>
+                </div>
+              </div>
+              <div class="source-health" id="sourceHealth"></div>
+            </section>
+          </div>
+
+          <section class="card cases-card">
+            <div class="card-header">
+              <div>
+                <h2>All Master Cases</h2>
+                <p>Select a row to open the unified case view</p>
+              </div>
+            </div>
+            <div class="toolbar">
+              <input id="caseSearch" type="search" placeholder="Filter cases..." />
+              <select id="caseTypeFilter">
+                <option value="all">All case types</option>
+                <option value="admission">Admission</option>
+                <option value="evacuation">Evacuation</option>
+                <option value="outpatient">Outpatient</option>
+              </select>
+              <select id="matchFilter">
+                <option value="all">All match states</option>
+                <option value="high">High confidence</option>
+                <option value="flagged">Flagged</option>
+              </select>
+              <span class="result-count"><strong id="caseCount">0</strong> cases shown</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Master Case</th>
+                    <th>Case Type</th>
+                    <th>Linked Tickets</th>
+                    <th>Channels</th>
+                    <th>Latest Interaction</th>
+                    <th>Match</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="caseTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-unmatched">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">MATCHING REVIEW</p>
+              <h1>Unmatched Interactions</h1>
+              <p class="page-description">Messages that could not be confidently linked to an existing Master Case.</p>
+            </div>
+            <div class="last-updated"><strong id="unmatchedSummary">0 items</strong><br />Read-only visibility</div>
+          </div>
+
+          <div class="notice warning-notice">
+            <span class="notice-icon">!</span>
+            <div>This view has no merge, confirm, create-case or edit controls. Resolution will be handled in a separate backend or admin process.</div>
+          </div>
+
+          <section class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Interaction</th>
+                    <th>Source</th>
+                    <th>Content Preview</th>
+                    <th>Possible Case</th>
+                    <th>Confidence</th>
+                    <th>Signals / Conflict</th>
+                    <th>Received</th>
+                  </tr>
+                </thead>
+                <tbody id="unmatchedTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-ingestion">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">INTEGRATION MONITORING</p>
+              <h1>Ingestion Status</h1>
+              <p class="page-description">Basic visibility for n8n workflows feeding the Storyboard.</p>
+            </div>
+            <div class="last-updated">Last checked<br /><strong id="ingestionUpdatedText">—</strong></div>
+          </div>
+
+          <div class="kpi-grid" id="ingestionKpis"></div>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Connected Sources</h2>
+                <p>Email and WhatsApp are the first MVP showcase channels</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Last Event</th>
+                    <th>Delay</th>
+                    <th>Latest Reference</th>
+                    <th>MVP Method</th>
+                  </tr>
+                </thead>
+                <tbody id="ingestionTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-detail">
+          <button class="back-button" id="backButton" type="button">← Back to Master Cases</button>
+
+          <section class="card case-hero" id="caseHero"></section>
+
+          <div class="detail-grid">
+            <section class="card detail-main-card">
+              <div class="tabs" role="tablist">
+                <button class="tab active" data-tab="timeline" type="button">Unified Timeline</button>
+                <button class="tab" data-tab="tickets" type="button">Linked Tickets</button>
+                <button class="tab" data-tab="matching" type="button">Match Evidence</button>
+              </div>
+
+              <div class="tab-panel active" id="tab-timeline">
+                <div class="timeline-toolbar">
+                  <div class="segment-control" id="timelineFilters">
+                    <button class="segment active" data-channel="all" type="button">All</button>
+                    <button class="segment" data-channel="email" type="button">Email</button>
+                    <button class="segment" data-channel="whatsapp" type="button">WhatsApp</button>
+                    <button class="segment" data-channel="document" type="button">Documents</button>
+                  </div>
+                  <span class="result-count"><strong id="timelineCount">0</strong> entries</span>
+                </div>
+                <div class="timeline" id="timelineContainer"></div>
+              </div>
+
+              <div class="tab-panel" id="tab-tickets">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ticket</th>
+                        <th>Party</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ticketTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="tab-panel" id="tab-matching">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Interaction</th>
+                        <th>Confidence</th>
+                        <th>Strong Identifiers</th>
+                        <th>Supporting Context</th>
+                        <th>Decision</th>
+                      </tr>
+                    </thead>
+                    <tbody id="matchingTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <aside class="side-stack">
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>AI Case Guidance</h2>
+                    <p>Generated by n8n later; mock output for this base dashboard</p>
+                  </div>
+                  <span class="readonly-mini">Read-only</span>
+                </div>
+                <div class="ai-panel" id="aiPanel"></div>
+              </section>
+
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Case Record</h2>
+                    <p>Core identifiers and linked data</p>
+                  </div>
+                </div>
+                <div class="record-list" id="caseRecord"></div>
+              </section>
+
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Matching Summary</h2>
+                    <p>Backend-generated evidence</p>
+                  </div>
+                </div>
+                <div class="matching-summary" id="matchingSummary"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
