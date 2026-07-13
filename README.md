@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Ulink Assist Case Storyboard MVP
 
 A framework-free static dashboard built with one HTML file, one CSS file and one JavaScript file.
@@ -31,3 +32,6 @@ No Vite, npm package or build command is required.
 ## Next integration step
 
 Replace the mock `dataRepository` methods in `app.js` with Supabase queries. n8n can populate interaction and AI suggestion tables. The frontend should continue to use only read permissions.
+=======
+# case_management_system
+>>>>>>> 043931d70e67a3b96d87d80fb3f2466b9af4a291
