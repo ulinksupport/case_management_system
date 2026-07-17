@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,6 +8,7 @@
   <title>Ulink Assist | Case Storyboard MVP</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
@@ -37,7 +39,7 @@
       </nav>
 
       <div class="sidebar-note">
-        <strong>Read-only MVP</strong>
+        <strong>Read-only</strong>
         Email and WhatsApp are grouped into one Master Case. AI content is for reference only.
       </div>
     </aside>
@@ -61,14 +63,16 @@
             <div>
               <p class="eyebrow">CASE OVERVIEW</p>
               <h1>Master Cases</h1>
-              <p class="page-description">Open one case to view all linked emails, WhatsApp messages, tickets and AI guidance in a single timeline.</p>
+              <p class="page-description">Open one case to view all linked emails, WhatsApp messages, tickets and AI
+                guidance in a single timeline.</p>
             </div>
             <div class="last-updated">Last refreshed<br /><strong id="lastUpdatedText">—</strong></div>
           </div>
 
           <div class="notice">
             <span class="notice-icon">i</span>
-            <div><strong>MVP scope:</strong> Data is displayed only. Replies, ticket updates and external actions remain outside the Storyboard.</div>
+            <div><strong>MVP scope:</strong> Data is displayed only. Replies, ticket updates and external actions remain
+              outside the Storyboard.</div>
           </div>
 
           <div class="kpi-grid" id="kpiGrid"></div>
@@ -148,7 +152,8 @@
 
           <div class="notice warning-notice">
             <span class="notice-icon">!</span>
-            <div>This view has no merge, confirm, create-case or edit controls. Resolution will be handled in a separate backend or admin process.</div>
+            <div>This view has no merge, confirm, create-case or edit controls. Resolution will be handled in a separate
+              backend or admin process.</div>
           </div>
 
           <section class="card">
@@ -310,4 +315,5 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>
+
 </html>
