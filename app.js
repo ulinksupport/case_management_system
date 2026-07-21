@@ -558,7 +558,19 @@ function buildLiveSnapshot(payload) {
     throw new Error("the response did not contain a tickets array");
   }
 
-  const cases = root.tickets.map(mapZohoTicketToCase);
+  const sortedTickets = [...root.tickets].sort((a, b) => {
+    const aTime = new Date(
+      a.updatedAt || a.createdAt || 0
+    ).getTime();
+
+    const bTime = new Date(
+      b.updatedAt || b.createdAt || 0
+    ).getTime();
+
+    return bTime - aTime;
+  });
+
+  const cases = sortedTickets.map(mapZohoTicketToCase);
   const generatedAt = root.generatedAt || new Date().toISOString();
 
   return {
