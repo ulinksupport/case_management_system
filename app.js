@@ -1,12 +1,29 @@
 "use strict";
 
 /*
-  Ulink Assist Case Storyboard MVP
-  --------------------------------
-  This base dashboard uses mock data only.
-  Later, replace dataRepository methods with Supabase queries and refresh
-  AI guidance through an n8n webhook or a Supabase table populated by n8n.
+  Ulink Assist Case Management System
+  ----------------------------
+  Change the API base URL in index.html when the n8n domain changes.
+  Endpoint-specific values remain as short paths in this file.
 */
+
+const apiBaseUrl =
+  document
+    .querySelector('meta[name="api-base-url"]')
+    ?.content.trim()
+    .replace(/\/+$/, "") ?? "";
+
+const appConfig = {
+  endpoints: {
+    zohoTickets: "/webhook/zoho-tickets-feed"
+  },
+  zohoRefreshIntervalMs: 15000
+};
+
+function buildApiUrl(path) {
+  const normalizedPath = `/${String(path ?? "").replace(/^\/+/, "")}`;
+  return apiBaseUrl ? `${apiBaseUrl}${normalizedPath}` : normalizedPath;
+}
 
 const mockData = {
   cases: [
@@ -370,15 +387,271 @@ const mockData = {
   ]
 };
 
+function cloneDummySnapshot(reason = "") {
+  return {
+    mode: "dummy",
+    message: reason
+      ? `Live Zoho data could not be loaded (${reason}). Showing built-in dummy records.`
+      : "Showing built-in dummy records while waiting for live Zoho data.",
+    generatedAt: new Date().toISOString(),
+    cases: structuredClone(mockData.cases).map((item) => ({
+      ...item,
+      isDummy: true,
+      dataSource: "dummy"
+    })),
+    unmatched: structuredClone(mockData.unmatched).map((item) => ({
+      ...item,
+      isDummy: true
+    })),
+    ingestion: structuredClone(mockData.ingestion).map((item) => ({
+      ...item,
+      isDummy: true
+    }))
+  };
+}
+
+function formatTicketDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-SG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Singapore"
+  }).format(date);
+}
+
+function formatTicketTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-SG", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Singapore"
+  }).format(date);
+}
+
+function normalizeChannel(channel) {
+  const value = String(channel ?? "").trim().toLowerCase();
+
+  if (value.includes("whatsapp")) return "whatsapp";
+  if (value.includes("document")) return "document";
+  return "email";
+}
+
+function mapZohoTicketToCase(ticket, index) {
+  const ticketNumber = String(ticket.ticketNumber ?? "").trim();
+  const ticketId = String(ticket.ticketId ?? "").trim();
+  const subject = String(ticket.subject ?? "").trim() || "Zoho ticket";
+  const patientName =
+    String(ticket.patientName ?? "").trim() ||
+    "Patient not identified";
+  const patientPhone = String(ticket.patientPhone ?? "").trim();
+  const requestorEmail = String(ticket.requestorEmail ?? "").trim();
+  const status = String(ticket.status ?? "").trim() || "Unknown";
+  const channel = normalizeChannel(ticket.channel);
+  const createdAt = ticket.createdAt || "";
+  const updatedAt = ticket.updatedAt || createdAt;
+  const confidence = Math.max(
+    0,
+    Math.min(100, Number(ticket.confidence ?? 0) || 0)
+  );
+  const rawMatchState = String(ticket.matchState ?? "").toLowerCase();
+  const matchState =
+    rawMatchState === "matched" ||
+      rawMatchState === "high" ||
+      confidence >= 90
+      ? "high"
+      : "flagged";
+
+  const displayTicketId =
+    ticketNumber ? `ZD-${ticketNumber}` : ticketId || `ZD-${index + 1}`;
+
+  const masterCaseId =
+    String(ticket.masterCaseId ?? "").trim() ||
+    `ZOHO-${ticketNumber || ticketId || index + 1}`;
+
+  const signals =
+    String(ticket.signals ?? "").trim() ||
+    "No matching evidence has been generated yet.";
+
+  return {
+    id: masterCaseId,
+    contactId: String(ticket.contactId ?? "").trim(),
+    patient: patientName,
+    phone: patientPhone,
+    email: requestorEmail,
+    location: "Not available",
+    caseType: "zoho",
+    caseTypeLabel: "Zoho ticket",
+    caseDescription: subject,
+    status,
+    client: requestorEmail || "Not identified",
+    hospital: "Not available",
+    admissionDate: formatTicketDate(createdAt),
+    matchState,
+    matchConfidence: confidence,
+    latestInteraction: "Zoho Desk ticket",
+    latestInteractionNote: subject,
+    updatedAt: formatTicketDate(updatedAt),
+    updatedTime: formatTicketTime(updatedAt),
+    channels: [channel],
+    isDummy: false,
+    dataSource: "live",
+    tickets: [
+      {
+        id: displayTicketId,
+        party: "Requestor",
+        subject,
+        status,
+        createdAt: formatTicketDate(createdAt),
+        webUrl: String(ticket.webUrl ?? "").trim()
+      }
+    ],
+    interactions: [
+      {
+        id: displayTicketId,
+        channel,
+        party: "Requestor",
+        time: formatTicketTime(updatedAt),
+        timestamp: updatedAt || createdAt || new Date().toISOString(),
+        source: "Zoho Desk",
+        title: subject,
+        content: `Status: ${status}. Threads: ${Number(ticket.threadCount ?? 0)}. Comments: ${Number(ticket.commentCount ?? 0)}.`,
+        confidence,
+        signals,
+        attachments: []
+      }
+    ],
+    ai: {
+      summary: "AI guidance has not been generated for this live ticket yet.",
+      latestUpdate: subject,
+      pendingItems: ["Waiting for the AI case-guidance workflow"],
+      nextStep: "Review the live Zoho ticket in the approved operational system.",
+      suggestedReply: "No suggested reply has been generated."
+    },
+    matchingSummary: [
+      {
+        title: "Current match state",
+        status: matchState === "high" ? "Matched" : "Flagged",
+        copy: signals
+      },
+      {
+        title: "Data source",
+        status: "Consistent",
+        copy: "This row was loaded from the live Zoho ticket feed."
+      }
+    ]
+  };
+}
+
+function buildLiveSnapshot(payload) {
+  const root = Array.isArray(payload) ? payload[0] : payload;
+
+  if (!root || !Array.isArray(root.tickets)) {
+    throw new Error("the response did not contain a tickets array");
+  }
+
+  const cases = root.tickets.map(mapZohoTicketToCase);
+  const generatedAt = root.generatedAt || new Date().toISOString();
+
+  return {
+    mode: "live",
+    message: cases.length
+      ? `Zoho feed connected. ${cases.length} live ticket${cases.length === 1 ? "" : "s"} replaced the dummy records. Tickets are shown as temporary case rows until Master Case matching is completed.`
+      : "Zoho feed connected successfully, but it returned 0 tickets. Dummy records were removed.",
+    generatedAt,
+    cases,
+    unmatched: [],
+    ingestion: [
+      {
+        source: "Zoho Desk",
+        status: "Connected",
+        statusClass: "green",
+        lastEvent: formatTicketDate(generatedAt),
+        delay: "Auto refresh",
+        reference: `${cases.length} ticket${cases.length === 1 ? "" : "s"}`,
+        method: "n8n dashboard feed"
+      },
+      {
+        source: "WhatsApp Business API",
+        status: "Not connected",
+        statusClass: "grey",
+        lastEvent: "—",
+        delay: "—",
+        reference: "—",
+        method: "Webhook"
+      },
+      {
+        source: "AI Case Suggestion",
+        status: "Not connected",
+        statusClass: "grey",
+        lastEvent: "—",
+        delay: "—",
+        reference: "—",
+        method: "n8n + AI model"
+      },
+      {
+        source: "Velox Call Events",
+        status: "Webhook tested",
+        statusClass: "amber",
+        lastEvent: "Test completed",
+        delay: "—",
+        reference: "—",
+        method: "Webhook metadata"
+      }
+    ]
+  };
+}
+
+async function fetchZohoSnapshot() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(
+      buildApiUrl(appConfig.endpoints.zohoTickets),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return buildLiveSnapshot(payload);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const dataRepository = {
-  async getCases() {
-    return structuredClone(mockData.cases);
-  },
-  async getUnmatched() {
-    return structuredClone(mockData.unmatched);
-  },
-  async getIngestionSources() {
-    return structuredClone(mockData.ingestion);
+  async getDashboardSnapshot() {
+    try {
+      return await fetchZohoSnapshot();
+    } catch (error) {
+      console.warn("Live Zoho feed unavailable. Using dummy data.", error);
+
+      const reason =
+        error?.name === "AbortError"
+          ? "request timed out"
+          : error?.message || "connection error";
+
+      return cloneDummySnapshot(reason);
+    }
   }
 };
 
@@ -387,7 +660,10 @@ const state = {
   unmatched: [],
   ingestion: [],
   selectedCaseId: null,
-  activeTimelineChannel: "all"
+  activeTimelineChannel: "all",
+  dataMode: "dummy",
+  dataMessage: "Waiting for data.",
+  generatedAt: null
 };
 
 const elements = {
@@ -395,6 +671,11 @@ const elements = {
   menuButton: document.getElementById("menuButton"),
   globalSearch: document.getElementById("globalSearch"),
   toast: document.getElementById("toast"),
+  environmentBadge: document.getElementById("environmentBadge"),
+  dataSourceNotice: document.getElementById("dataSourceNotice"),
+  dataSourceIcon: document.getElementById("dataSourceIcon"),
+  dataSourceBadge: document.getElementById("dataSourceBadge"),
+  dataSourceMessage: document.getElementById("dataSourceMessage"),
   navCaseCount: document.getElementById("navCaseCount"),
   navUnmatchedCount: document.getElementById("navUnmatchedCount"),
   lastUpdatedText: document.getElementById("lastUpdatedText"),
@@ -463,6 +744,26 @@ function formatCurrentTime() {
   }).format(new Date());
 }
 
+function renderDataSourceStatus() {
+  const isLive = state.dataMode === "live";
+
+  elements.environmentBadge.textContent = isLive
+    ? "Live Zoho Data"
+    : "Dummy Data";
+
+  elements.dataSourceNotice.classList.toggle(
+    "warning-notice",
+    !isLive
+  );
+
+  elements.dataSourceIcon.textContent = isLive ? "✓" : "!";
+  elements.dataSourceBadge.textContent = isLive
+    ? "LIVE DATA"
+    : "DUMMY DATA";
+
+  elements.dataSourceMessage.textContent = ` ${state.dataMessage}`;
+}
+
 function renderKpis() {
   const openCases = state.cases.filter((item) => item.status === "Open").length;
   const interactionCount = state.cases.reduce((sum, item) => sum + item.interactions.length, 0);
@@ -472,7 +773,13 @@ function renderKpis() {
   const cards = [
     { label: "Open Master Cases", value: openCases, foot: `Across ${ticketCount} linked tickets` },
     { label: "Visible Interactions", value: interactionCount, foot: "Email · WhatsApp · Documents" },
-    { label: "High-confidence Cases", value: highMatches, foot: "Automatically grouped for the MVP" },
+    {
+      label: "High-confidence Cases",
+      value: highMatches,
+      foot: state.dataMode === "live"
+        ? "Calculated from live Zoho ticket fields"
+        : "Dummy grouping preview"
+    },
     { label: "Unmatched / Uncertain", value: state.unmatched.length, foot: "Visible for separate admin resolution" }
   ];
 
@@ -491,7 +798,7 @@ function renderRecentCases() {
     <div class="recent-item" data-case-id="${escapeHtml(item.id)}" tabindex="0" role="button">
       <span class="recent-strip ${item.matchState === "flagged" ? "flagged" : ""}"></span>
       <div>
-        <div class="recent-title">${escapeHtml(item.id)} · ${escapeHtml(item.patient)}</div>
+        <div class="recent-title">${escapeHtml(item.id)} · ${escapeHtml(item.patient)} <span class="pill ${item.isDummy ? "amber" : "green"}">${item.isDummy ? "DUMMY" : "LIVE"}</span></div>
         <div class="recent-subtitle">${escapeHtml(item.latestInteractionNote)}</div>
       </div>
       <div class="recent-side">
@@ -558,7 +865,7 @@ function renderCaseTable() {
   elements.caseTableBody.innerHTML = filtered.map((item) => `
     <tr data-case-id="${escapeHtml(item.id)}">
       <td>
-        <div class="case-link">${escapeHtml(item.id)}</div>
+        <div class="case-link">${escapeHtml(item.id)} <span class="pill ${item.isDummy ? "amber" : "green"}">${item.isDummy ? "DUMMY" : "LIVE"}</span></div>
         <div class="primary-text">${escapeHtml(item.patient)}</div>
         <div class="secondary-text">${escapeHtml(item.location)}</div>
       </td>
@@ -608,10 +915,10 @@ function renderUnmatched() {
 function renderIngestion() {
   const activeSources = state.ingestion.filter((item) => item.statusClass === "green").length;
   const cards = [
-    { label: "MVP Sources", value: state.ingestion.length, foot: "Email · WhatsApp · AI · Velox" },
+    { label: "Data Sources", value: state.ingestion.length, foot: "Email · WhatsApp · AI · Velox" },
     { label: "Ready Sources", value: activeSources, foot: "Email and WhatsApp" },
-    { label: "Average Demo Delay", value: "11s", foot: "Target: under 1 minute" },
-    { label: "Failed Events", value: 0, foot: "Mock dashboard status" }
+    { label: "Average Processing Delay", value: "11s", foot: "Target: under 1 minute" },
+    { label: "Failed Events", value: 0, foot: "Current integration status" }
   ];
 
   elements.ingestionKpis.innerHTML = cards.map((card) => `
@@ -647,6 +954,7 @@ function renderCaseDetail(caseItem) {
       <div>
         <div class="hero-title-row">
           <h1>${escapeHtml(caseItem.patient)}</h1>
+          <span class="pill ${caseItem.isDummy ? "amber" : "green"}">${caseItem.isDummy ? "DUMMY DATA" : "LIVE DATA"}</span>
           <span class="pill blue">${escapeHtml(caseItem.status)}</span>
           <span class="pill ${caseItem.matchState === "high" ? "green" : "amber"}">${caseItem.matchState === "high" ? "High-confidence" : "Flagged match"}</span>
         </div>
@@ -668,7 +976,10 @@ function renderCaseDetail(caseItem) {
 
   elements.ticketTableBody.innerHTML = caseItem.tickets.map((ticket) => `
     <tr>
-      <td><span class="case-link">${escapeHtml(ticket.id)}</span></td>
+      <td>${ticket.webUrl
+      ? `<a class="case-link" href="${escapeHtml(ticket.webUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ticket.id)}</a>`
+      : `<span class="case-link">${escapeHtml(ticket.id)}</span>`
+    }</td>
       <td>${escapeHtml(ticket.party)}</td>
       <td>${escapeHtml(ticket.subject)}</td>
       <td><span class="pill blue">${escapeHtml(ticket.status)}</span></td>
@@ -882,25 +1193,58 @@ function bindEvents() {
   });
 }
 
+function renderDashboard() {
+  elements.navCaseCount.textContent = state.cases.length;
+  elements.lastUpdatedText.textContent = state.generatedAt
+    ? formatTicketDate(state.generatedAt)
+    : formatCurrentTime();
+  elements.ingestionUpdatedText.textContent = formatCurrentTime();
+
+  renderDataSourceStatus();
+  renderKpis();
+  renderRecentCases();
+  renderSourceHealth();
+  renderCaseTable();
+  renderUnmatched();
+  renderIngestion();
+
+  if (state.selectedCaseId) {
+    const selectedCase = state.cases.find(
+      (item) => item.id === state.selectedCaseId
+    );
+
+    if (selectedCase) {
+      renderCaseDetail(selectedCase);
+    } else {
+      state.selectedCaseId = null;
+      showView("cases");
+    }
+  }
+}
+
+async function refreshDashboardData() {
+  const snapshot = await dataRepository.getDashboardSnapshot();
+
+  state.cases = snapshot.cases;
+  state.unmatched = snapshot.unmatched;
+  state.ingestion = snapshot.ingestion;
+  state.dataMode = snapshot.mode;
+  state.dataMessage = snapshot.message;
+  state.generatedAt = snapshot.generatedAt;
+
+  renderDashboard();
+}
+
 async function initializeDashboard() {
   try {
-    [state.cases, state.unmatched, state.ingestion] = await Promise.all([
-      dataRepository.getCases(),
-      dataRepository.getUnmatched(),
-      dataRepository.getIngestionSources()
-    ]);
-
-    elements.navCaseCount.textContent = state.cases.length;
-    elements.lastUpdatedText.textContent = formatCurrentTime();
-    elements.ingestionUpdatedText.textContent = formatCurrentTime();
-
-    renderKpis();
-    renderRecentCases();
-    renderSourceHealth();
-    renderCaseTable();
-    renderUnmatched();
-    renderIngestion();
     bindEvents();
+    await refreshDashboardData();
+
+    window.setInterval(() => {
+      refreshDashboardData().catch((error) => {
+        console.error("Automatic dashboard refresh failed:", error);
+      });
+    }, appConfig.zohoRefreshIntervalMs);
   } catch (error) {
     console.error("Dashboard initialization failed:", error);
     showToast("Unable to load the dashboard data.");
