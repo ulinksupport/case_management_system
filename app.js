@@ -481,6 +481,87 @@ function mapZohoTicketToCase(ticket, index) {
     String(ticket.signals ?? "").trim() ||
     "No matching evidence has been generated yet.";
 
+  const aiSuggestion =
+    ticket.aiSuggestion &&
+      ticket.aiSuggestion.status === "ready"
+      ? ticket.aiSuggestion
+      : null;
+
+  const ai = aiSuggestion
+    ? {
+      status: "ready",
+
+      summary:
+        String(aiSuggestion.summary ?? "").trim() ||
+        "No AI summary was returned.",
+
+      latestUpdate:
+        String(aiSuggestion.latestUpdate ?? "").trim() ||
+        "No latest update was returned.",
+
+      pendingItems:
+        Array.isArray(aiSuggestion.pendingItems)
+          ? aiSuggestion.pendingItems
+            .map((item) => String(item ?? "").trim())
+            .filter(Boolean)
+          : [],
+
+      nextStep:
+        String(aiSuggestion.nextStep ?? "").trim() ||
+        "No next step was returned.",
+
+      suggestedReply:
+        String(aiSuggestion.suggestedReply ?? "").trim() ||
+        "No suggested reply was returned.",
+
+      riskFlags:
+        Array.isArray(aiSuggestion.riskFlags)
+          ? aiSuggestion.riskFlags
+            .map((item) => String(item ?? "").trim())
+            .filter(Boolean)
+          : [],
+
+      confidence: Math.max(
+        0,
+        Math.min(
+          100,
+          Number(aiSuggestion.confidence ?? 0) || 0
+        )
+      ),
+
+      generatedAt:
+        String(aiSuggestion.generatedAt ?? "").trim(),
+
+      model:
+        String(aiSuggestion.model ?? "").trim()
+    }
+    : {
+      status: "pending",
+
+      summary:
+        "AI guidance has not been generated for this live ticket yet.",
+
+      latestUpdate: subject,
+
+      pendingItems: [
+        "Waiting for the AI case-guidance workflow"
+      ],
+
+      nextStep:
+        "Review the live Zoho ticket in the approved operational system.",
+
+      suggestedReply:
+        "No suggested reply has been generated.",
+
+      riskFlags: [],
+
+      confidence: 0,
+
+      generatedAt: "",
+
+      model: ""
+    };
+
   return {
     id: masterCaseId,
     contactId: String(ticket.contactId ?? "").trim(),
@@ -529,13 +610,7 @@ function mapZohoTicketToCase(ticket, index) {
         attachments: []
       }
     ],
-    ai: {
-      summary: "AI guidance has not been generated for this live ticket yet.",
-      latestUpdate: subject,
-      pendingItems: ["Waiting for the AI case-guidance workflow"],
-      nextStep: "Review the live Zoho ticket in the approved operational system.",
-      suggestedReply: "No suggested reply has been generated."
-    },
+    ai,
     matchingSummary: [
       {
         title: "Current match state",
@@ -675,7 +750,11 @@ const state = {
   activeTimelineChannel: "all",
   dataMode: "dummy",
   dataMessage: "Waiting for data.",
-  generatedAt: null
+  generatedAt: null,
+
+  // Used for silent background updates.
+  snapshotSignature: "",
+  refreshInProgress: false
 };
 
 const elements = {
@@ -958,8 +1037,23 @@ function sortInteractions(interactions) {
 }
 
 function renderCaseDetail(caseItem) {
+  const isRefreshingSameCase =
+    state.selectedCaseId === caseItem.id;
+
+  const activeTabBeforeRender =
+    isRefreshingSameCase
+      ? document.querySelector(".tab.active")
+        ?.dataset.tab || "timeline"
+      : "timeline";
+
+  const activeChannelBeforeRender =
+    isRefreshingSameCase
+      ? state.activeTimelineChannel
+      : "all";
+
   state.selectedCaseId = caseItem.id;
-  state.activeTimelineChannel = "all";
+  state.activeTimelineChannel =
+    activeChannelBeforeRender;
 
   elements.caseHero.innerHTML = `
     <div class="hero-top">
@@ -1059,10 +1153,17 @@ function renderCaseDetail(caseItem) {
     </div>
   `).join("");
 
-  activateTab("timeline");
-  document.querySelectorAll("#timelineFilters .segment").forEach((segment) => {
-    segment.classList.toggle("active", segment.dataset.channel === "all");
-  });
+  activateTab(activeTabBeforeRender);
+
+  document
+    .querySelectorAll("#timelineFilters .segment")
+    .forEach((segment) => {
+      segment.classList.toggle(
+        "active",
+        segment.dataset.channel ===
+        state.activeTimelineChannel
+      );
+    });
 }
 
 function getStrongIdentifiers(interaction, caseItem) {
@@ -1234,17 +1335,120 @@ function renderDashboard() {
   }
 }
 
+function buildSnapshotSignature(snapshot) {
+  return JSON.stringify({
+    mode: snapshot.mode,
+
+    cases: snapshot.cases.map((item) => ({
+      id: item.id,
+      status: item.status,
+      updatedAt: item.updatedAt,
+      updatedTime: item.updatedTime,
+      matchState: item.matchState,
+      matchConfidence: item.matchConfidence,
+      caseDescription: item.caseDescription,
+
+      tickets: item.tickets.map((ticket) => ({
+        id: ticket.id,
+        status: ticket.status,
+        subject: ticket.subject
+      })),
+
+      ai: {
+        status: item.ai?.status || "",
+        generatedAt:
+          item.ai?.generatedAt || "",
+        confidence:
+          Number(item.ai?.confidence || 0),
+        summary: item.ai?.summary || "",
+        latestUpdate:
+          item.ai?.latestUpdate || "",
+        nextStep: item.ai?.nextStep || ""
+      }
+    })),
+
+    unmatched: snapshot.unmatched.map(
+      (item) => ({
+        id: item.id,
+        received: item.received,
+        confidence: item.confidence
+      })
+    )
+  });
+}
+
 async function refreshDashboardData() {
-  const snapshot = await dataRepository.getDashboardSnapshot();
+  // Prevent overlapping requests when the
+  // previous request is still running.
+  if (state.refreshInProgress) {
+    return;
+  }
 
-  state.cases = snapshot.cases;
-  state.unmatched = snapshot.unmatched;
-  state.ingestion = snapshot.ingestion;
-  state.dataMode = snapshot.mode;
-  state.dataMessage = snapshot.message;
-  state.generatedAt = snapshot.generatedAt;
+  state.refreshInProgress = true;
 
-  renderDashboard();
+  try {
+    const snapshot =
+      await dataRepository.getDashboardSnapshot();
+
+    const newSignature =
+      buildSnapshotSignature(snapshot);
+
+    const dataChanged =
+      newSignature !==
+      state.snapshotSignature;
+
+    state.generatedAt =
+      snapshot.generatedAt;
+
+    // Data is unchanged. Update only the
+    // refresh timestamp without rebuilding
+    // the dashboard HTML.
+    if (!dataChanged) {
+      elements.lastUpdatedText.textContent =
+        state.generatedAt
+          ? formatTicketDate(
+            state.generatedAt
+          )
+          : formatCurrentTime();
+
+      elements.ingestionUpdatedText.textContent =
+        formatCurrentTime();
+
+      return;
+    }
+
+    const previousScrollPosition =
+      window.scrollY;
+
+    state.cases = snapshot.cases;
+    state.unmatched = snapshot.unmatched;
+    state.ingestion = snapshot.ingestion;
+    state.dataMode = snapshot.mode;
+    state.dataMessage = snapshot.message;
+    state.snapshotSignature =
+      newSignature;
+
+    renderDashboard();
+
+    // Preserve the user's current page position.
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: previousScrollPosition,
+        behavior: "auto"
+      });
+    });
+  } catch (error) {
+    console.error(
+      "Silent dashboard refresh failed:",
+      error
+    );
+
+    // Keep the current screen visible.
+    // Do not replace it with dummy records
+    // because one background refresh failed.
+  } finally {
+    state.refreshInProgress = false;
+  }
 }
 
 async function initializeDashboard() {
@@ -1253,10 +1457,35 @@ async function initializeDashboard() {
     await refreshDashboardData();
 
     window.setInterval(() => {
-      refreshDashboardData().catch((error) => {
-        console.error("Automatic dashboard refresh failed:", error);
-      });
+      if (document.hidden) {
+        return;
+      }
+
+      refreshDashboardData().catch(
+        (error) => {
+          console.error(
+            "Automatic dashboard refresh failed:",
+            error
+          );
+        }
+      );
     }, appConfig.zohoRefreshIntervalMs);
+
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (!document.hidden) {
+          refreshDashboardData().catch(
+            (error) => {
+              console.error(
+                "Dashboard refresh after tab activation failed:",
+                error
+              );
+            }
+          );
+        }
+      }
+    );
   } catch (error) {
     console.error("Dashboard initialization failed:", error);
     showToast("Unable to load the dashboard data.");
