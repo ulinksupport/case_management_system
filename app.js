@@ -458,17 +458,46 @@ function mapZohoTicketToCase(ticket, index) {
   const channel = normalizeChannel(ticket.channel);
   const createdAt = ticket.createdAt || "";
   const updatedAt = ticket.updatedAt || createdAt;
-  const confidence = Math.max(
-    0,
-    Math.min(100, Number(ticket.confidence ?? 0) || 0)
-  );
-  const rawMatchState = String(ticket.matchState ?? "").toLowerCase();
-  const matchState =
+  const rawConfidence = ticket.confidence;
+
+  const hasMatchConfidence =
+    rawConfidence !== null &&
+    rawConfidence !== undefined &&
+    String(rawConfidence).trim() !== "" &&
+    Number.isFinite(Number(rawConfidence));
+
+  const confidence = hasMatchConfidence
+    ? Math.max(
+      0,
+      Math.min(100, Number(rawConfidence))
+    )
+    : null;
+
+  const rawMatchState = String(
+    ticket.matchState ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  let matchState = "not-evaluated";
+
+  if (
     rawMatchState === "matched" ||
-      rawMatchState === "high" ||
+    rawMatchState === "high"
+  ) {
+    matchState = "high";
+  } else if (
+    rawMatchState === "flagged" ||
+    rawMatchState === "needs-review" ||
+    rawMatchState === "review"
+  ) {
+    matchState = "flagged";
+  } else if (hasMatchConfidence) {
+    matchState =
       confidence >= 90
-      ? "high"
-      : "flagged";
+        ? "high"
+        : "flagged";
+  }
 
   const displayTicketId =
     ticketNumber ? `ZD-${ticketNumber}` : ticketId || `ZD-${index + 1}`;
@@ -803,6 +832,43 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function getLinkStatusLabel(matchState) {
+  if (matchState === "high") {
+    return "Linked";
+  }
+
+  if (matchState === "flagged") {
+    return "Needs review";
+  }
+
+  return "Not evaluated";
+}
+
+function getLinkStatusClass(matchState) {
+  if (matchState === "high") {
+    return "green";
+  }
+
+  if (matchState === "flagged") {
+    return "amber";
+  }
+
+  return "grey";
+}
+
+function getLinkStatusText(caseItem) {
+  if (
+    caseItem.matchState === "not-evaluated" ||
+    caseItem.matchConfidence === null
+  ) {
+    return "Not evaluated";
+  }
+
+  return `${getLinkStatusLabel(
+    caseItem.matchState
+  )} · ${caseItem.matchConfidence}%`;
+}
+
 function showToast(message) {
   clearTimeout(showToast.timer);
   elements.toast.textContent = message;
@@ -893,8 +959,10 @@ function renderRecentCases() {
         <div class="recent-subtitle">${escapeHtml(item.latestInteractionNote)}</div>
       </div>
       <div class="recent-side">
-        <div class="recent-score">${escapeHtml(item.matchConfidence)}%</div>
-        <div class="recent-score-label">match confidence</div>
+        <div class="recent-score">
+  ${escapeHtml(getLinkStatusText(item))}
+</div>
+<div class="recent-score-label">link status</div>
       </div>
     </div>
   `).join("");
@@ -977,7 +1045,11 @@ function renderCaseTable() {
         <div class="primary-text">${escapeHtml(item.latestInteraction)}</div>
         <div class="secondary-text">${escapeHtml(item.latestInteractionNote)}</div>
       </td>
-      <td><span class="pill ${item.matchState === "high" ? "green" : "amber"}">${item.matchState === "high" ? "High" : "Flagged"} · ${escapeHtml(item.matchConfidence)}%</span></td>
+      <td>
+  <span class="pill ${getLinkStatusClass(item.matchState)}">
+    ${escapeHtml(getLinkStatusText(item))}
+  </span>
+</td>
       <td>
         <div class="primary-text">${escapeHtml(item.updatedAt)}</div>
         <div class="secondary-text">${escapeHtml(item.updatedTime)}</div>
@@ -1062,11 +1134,15 @@ function renderCaseDetail(caseItem) {
           <h1>${escapeHtml(caseItem.patient)}</h1>
           <span class="pill ${caseItem.isDummy ? "amber" : "green"}">${caseItem.isDummy ? "DUMMY DATA" : "LIVE DATA"}</span>
           <span class="pill blue">${escapeHtml(caseItem.status)}</span>
-          <span class="pill ${caseItem.matchState === "high" ? "green" : "amber"}">${caseItem.matchState === "high" ? "High-confidence" : "Flagged match"}</span>
+          <span class="pill ${getLinkStatusClass(caseItem.matchState)}">
+            ${escapeHtml(getLinkStatusLabel(caseItem.matchState))}
+          </span>
         </div>
         <div class="hero-subtitle">Master Case <strong>${escapeHtml(caseItem.id)}</strong> · ${escapeHtml(caseItem.caseTypeLabel)} · ${escapeHtml(caseItem.location)}</div>
       </div>
-      <span class="pill ${caseItem.matchState === "high" ? "green" : "amber"}">Overall match ${escapeHtml(caseItem.matchConfidence)}%</span>
+      <span class="pill ${getLinkStatusClass(caseItem.matchState)}">
+        Master Case link: ${escapeHtml(getLinkStatusText(caseItem))}
+      </span>
     </div>
     <div class="hero-grid">
       <div><div class="info-label">Client</div><div class="info-value">${escapeHtml(caseItem.client)}</div></div>
