@@ -15,7 +15,8 @@ const apiBaseUrl =
 
 const appConfig = {
   endpoints: {
-    zohoTickets: "/webhook/zoho-tickets-feed"
+    zohoTickets: "/webhook/zoho-tickets-feed",
+    zohoTicketDetail: "/webhook/zoho-ticket-detail"
   },
   zohoRefreshIntervalMs: 15000
 };
@@ -593,6 +594,10 @@ function mapZohoTicketToCase(ticket, index) {
 
   return {
     id: masterCaseId,
+
+    // Long internal Zoho ID used by the detail API.
+    zohoTicketId: ticketId,
+
     contactId: String(ticket.contactId ?? "").trim(),
     patient: patientName,
     phone: patientPhone,
@@ -754,6 +759,212 @@ async function fetchZohoSnapshot() {
   }
 }
 
+function mapZohoDetailEventToInteraction(event) {
+  const eventType = String(
+    event.eventType ?? ""
+  ).toLowerCase();
+
+  const direction = String(
+    event.direction ?? ""
+  ).toLowerCase();
+
+  const isComment =
+    eventType === "comment" ||
+    event.channel === "internal_comment";
+
+  const channel = isComment
+    ? "comment"
+    : normalizeChannel(event.channel);
+
+  let party = "Unknown";
+
+  if (isComment) {
+    party =
+      String(event.from ?? "").trim() ||
+      "Internal user";
+  } else if (direction === "out") {
+    party =
+      String(event.from ?? "").trim() ||
+      "Ulink Assist";
+  } else {
+    party =
+      String(event.from ?? "").trim() ||
+      "External sender";
+  }
+
+  let fallbackTitle = "Zoho activity";
+
+  if (isComment) {
+    fallbackTitle = event.isPublic
+      ? "Public comment"
+      : "Internal comment";
+  } else if (direction === "out") {
+    fallbackTitle = "Outgoing email";
+  } else if (direction === "in") {
+    fallbackTitle = "Incoming email";
+  }
+
+  const attachmentNames = Array.isArray(
+    event.attachments
+  )
+    ? event.attachments
+      .map((file) =>
+        String(
+          file?.name ??
+          file?.fileName ??
+          ""
+        ).trim()
+      )
+      .filter(Boolean)
+    : [];
+
+  return {
+    id: String(event.id ?? ""),
+
+    channel,
+
+    party,
+
+    time: formatTicketTime(
+      event.timestamp
+    ),
+
+    timestamp: String(
+      event.timestamp ?? ""
+    ),
+
+    source: isComment
+      ? "Zoho Desk comment"
+      : "Zoho Desk email",
+
+    title:
+      String(event.title ?? "").trim() ||
+      fallbackTitle,
+
+    // Full main email or comment content.
+    content:
+      String(event.content ?? "").trim() ||
+      "No readable content was returned.",
+
+    direction,
+
+    eventType: isComment
+      ? "comment"
+      : "email",
+
+    status: String(
+      event.status ?? ""
+    ),
+
+    isPublic:
+      Boolean(event.isPublic),
+
+    isDescriptionThread:
+      Boolean(event.isDescriptionThread),
+
+    // Matching confidence does not apply
+    // to individual Zoho timeline events.
+    confidence: null,
+
+    signals: isComment
+      ? "Internal Zoho Desk activity"
+      : direction === "out"
+        ? "Outgoing Zoho Desk email"
+        : "Incoming Zoho Desk email",
+
+    attachments: attachmentNames
+  };
+}
+
+async function fetchZohoTicketDetail(
+  ticketId
+) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!/^\d{10,30}$/.test(
+    normalizedTicketId
+  )) {
+    throw new Error(
+      "A valid internal Zoho ticket ID is required."
+    );
+  }
+
+  const controller =
+    new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    45000
+  );
+
+  try {
+    const endpoint =
+      `${appConfig.endpoints.zohoTicketDetail}` +
+      `?ticketId=${encodeURIComponent(
+        normalizedTicketId
+      )}`;
+
+    const response = await fetch(
+      buildApiUrl(endpoint),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Ticket history request returned HTTP ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    const root = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (
+      !root?.success ||
+      !Array.isArray(root.events)
+    ) {
+      throw new Error(
+        "The ticket history response did not contain an events array."
+      );
+    }
+
+    return {
+      ticket: root.ticket ?? null,
+
+      totalThreads: Number(
+        root.totalThreads ?? 0
+      ),
+
+      totalComments: Number(
+        root.totalComments ?? 0
+      ),
+
+      interactions: root.events
+        .map(
+          mapZohoDetailEventToInteraction
+        )
+        .filter(
+          (interaction) =>
+            interaction.id &&
+            interaction.timestamp
+        )
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const dataRepository = {
   async getDashboardSnapshot() {
     try {
@@ -783,7 +994,10 @@ const state = {
 
   // Used for silent background updates.
   snapshotSignature: "",
-  refreshInProgress: false
+  refreshInProgress: false,
+
+  detailCache: new Map(),
+  detailRequestSequence: 0
 };
 
 const elements = {
@@ -1301,15 +1515,157 @@ function activateTab(tabName) {
   });
 }
 
-function openCase(caseId) {
-  const selectedCase = state.cases.find((item) => item.id === caseId);
+async function openCase(caseId) {
+  const selectedCase = state.cases.find(
+    (item) => item.id === caseId
+  );
+
   if (!selectedCase) {
-    showToast("The selected case could not be found.");
+    showToast(
+      "The selected case could not be found."
+    );
     return;
   }
 
+  // Open the detail page immediately.
   renderCaseDetail(selectedCase);
   showView("detail");
+
+  // Dummy records do not have a real Zoho ID.
+  if (
+    selectedCase.isDummy ||
+    !selectedCase.zohoTicketId
+  ) {
+    return;
+  }
+
+  const ticketId = String(
+    selectedCase.zohoTicketId
+  ).trim();
+
+  // Reuse previously retrieved history.
+  const cachedDetail =
+    state.detailCache.get(ticketId);
+
+  if (cachedDetail) {
+    selectedCase.interactions =
+      cachedDetail.interactions;
+
+    selectedCase.totalThreads =
+      cachedDetail.totalThreads;
+
+    selectedCase.totalComments =
+      cachedDetail.totalComments;
+
+    selectedCase.detailLoaded = true;
+
+    renderCaseDetail(selectedCase);
+    return;
+  }
+
+  const requestSequence =
+    ++state.detailRequestSequence;
+
+  elements.timelineCount.textContent = "…";
+
+  elements.timelineContainer.innerHTML = `
+    <div class="empty-state">
+      Loading full Zoho email history and comments…
+    </div>
+  `;
+
+  try {
+    const detail =
+      await fetchZohoTicketDetail(ticketId);
+
+    // Ignore this response if the user opened
+    // another case while the request was running.
+    if (
+      requestSequence !==
+      state.detailRequestSequence ||
+      state.selectedCaseId !== caseId
+    ) {
+      return;
+    }
+
+    const currentCase = state.cases.find(
+      (item) => item.id === caseId
+    );
+
+    if (!currentCase) {
+      return;
+    }
+
+    const interactions =
+      sortInteractions(detail.interactions);
+
+    const cachedResult = {
+      interactions,
+      totalThreads: detail.totalThreads,
+      totalComments: detail.totalComments
+    };
+
+    state.detailCache.set(
+      ticketId,
+      cachedResult
+    );
+
+    currentCase.interactions = interactions;
+    currentCase.totalThreads =
+      detail.totalThreads;
+    currentCase.totalComments =
+      detail.totalComments;
+    currentCase.detailLoaded = true;
+
+    if (detail.ticket) {
+      currentCase.status =
+        String(
+          detail.ticket.status ??
+          currentCase.status
+        ).trim() || currentCase.status;
+
+      if (currentCase.tickets[0]) {
+        currentCase.tickets[0].status =
+          currentCase.status;
+
+        currentCase.tickets[0].subject =
+          String(
+            detail.ticket.subject ??
+            currentCase.tickets[0].subject
+          ).trim() ||
+          currentCase.tickets[0].subject;
+      }
+    }
+
+    renderCaseDetail(currentCase);
+  } catch (error) {
+    if (
+      requestSequence !==
+      state.detailRequestSequence ||
+      state.selectedCaseId !== caseId
+    ) {
+      return;
+    }
+
+    console.error(
+      "Unable to load Zoho ticket history:",
+      error
+    );
+
+    const currentCase = state.cases.find(
+      (item) => item.id === caseId
+    );
+
+    if (currentCase) {
+      renderCaseDetail(currentCase);
+    }
+
+    showToast(
+      error?.name === "AbortError"
+        ? "Zoho history request timed out."
+        : "Unable to load the full Zoho history."
+    );
+  }
 }
 
 function handleGlobalSearch() {
@@ -1497,6 +1853,33 @@ async function refreshDashboardData() {
       window.scrollY;
 
     state.cases = snapshot.cases;
+
+    // Restore any ticket details already retrieved
+    // from the separate Zoho detail endpoint.
+    for (const caseItem of state.cases) {
+      const ticketId = String(
+        caseItem.zohoTicketId ?? ""
+      ).trim();
+
+      const cachedDetail =
+        state.detailCache.get(ticketId);
+
+      if (!cachedDetail) {
+        continue;
+      }
+
+      caseItem.interactions =
+        cachedDetail.interactions;
+
+      caseItem.totalThreads =
+        cachedDetail.totalThreads;
+
+      caseItem.totalComments =
+        cachedDetail.totalComments;
+
+      caseItem.detailLoaded = true;
+    }
+
     state.unmatched = snapshot.unmatched;
     state.ingestion = snapshot.ingestion;
     state.dataMode = snapshot.mode;
