@@ -459,45 +459,49 @@ function mapZohoTicketToCase(ticket, index) {
   const channel = normalizeChannel(ticket.channel);
   const createdAt = ticket.createdAt || "";
   const updatedAt = ticket.updatedAt || createdAt;
-  const rawConfidence = ticket.confidence;
-
-  const hasMatchConfidence =
-    rawConfidence !== null &&
-    rawConfidence !== undefined &&
-    String(rawConfidence).trim() !== "" &&
-    Number.isFinite(Number(rawConfidence));
-
-  const confidence = hasMatchConfidence
-    ? Math.max(
-      0,
-      Math.min(100, Number(rawConfidence))
-    )
-    : null;
-
   const rawMatchState = String(
     ticket.matchState ?? ""
   )
     .trim()
     .toLowerCase();
 
+  const rawMatchConfidence =
+    ticket.matchConfidence;
+
+  const hasMatchConfidence =
+    rawMatchConfidence !== null &&
+    rawMatchConfidence !== undefined &&
+    String(rawMatchConfidence).trim() !== "" &&
+    Number.isFinite(
+      Number(rawMatchConfidence)
+    );
+
+  const confidence = hasMatchConfidence
+    ? Math.max(
+      0,
+      Math.min(
+        100,
+        Number(rawMatchConfidence)
+      )
+    )
+    : null;
+
   let matchState = "not-evaluated";
 
   if (
     rawMatchState === "matched" ||
+    rawMatchState === "linked" ||
     rawMatchState === "high"
   ) {
     matchState = "high";
   } else if (
     rawMatchState === "flagged" ||
     rawMatchState === "needs-review" ||
-    rawMatchState === "review"
+    rawMatchState === "review" ||
+    rawMatchState === "conflict" ||
+    rawMatchState === "uncertain"
   ) {
     matchState = "flagged";
-  } else if (hasMatchConfidence) {
-    matchState =
-      confidence >= 90
-        ? "high"
-        : "flagged";
   }
 
   const displayTicketId =
@@ -647,9 +651,13 @@ function mapZohoTicketToCase(ticket, index) {
     ai,
     matchingSummary: [
       {
-        title: "Current match state",
-        status: matchState === "high" ? "Matched" : "Flagged",
-        copy: signals
+        title: "Master Case link status",
+        status: getLinkStatusLabel(matchState),
+        statusClass: getLinkStatusClass(matchState),
+        copy:
+          matchState === "not-evaluated"
+            ? "The Master Case linking engine has not evaluated this ticket yet."
+            : signals
       },
       {
         title: "Data source",
@@ -1437,7 +1445,19 @@ function renderCaseDetail(caseItem) {
     <div class="match-box">
       <div class="match-box-head">
         <span class="match-box-title">${escapeHtml(item.title)}</span>
-        <span class="pill ${item.status === "Matched" || item.status === "Consistent" ? "green" : "amber"}">${escapeHtml(item.status)}</span>
+        <span class="pill ${item.statusClass ||
+    (
+      item.status === "Matched" ||
+        item.status === "Consistent" ||
+        item.status === "Linked"
+        ? "green"
+        : item.status === "Not evaluated"
+          ? "grey"
+          : "amber"
+    )
+    }">
+          ${escapeHtml(item.status)}
+        </span>
       </div>
       <div class="match-box-copy">${escapeHtml(item.copy)}</div>
     </div>
@@ -1489,8 +1509,23 @@ function renderTimeline(caseItem) {
         <div class="timeline-preview">${escapeHtml(item.content)}</div>
         ${item.attachments.length ? `<div class="attachment-list">${item.attachments.map((file) => `<span class="attachment-chip">${escapeHtml(file)}</span>`).join("")}</div>` : ""}
         <div class="match-line">
-          <span class="match-signals">${escapeHtml(item.signals)}</span>
-          <span class="pill ${item.confidence >= 90 ? "green" : "amber"}">${escapeHtml(item.confidence)}%</span>
+          <span class="match-signals">
+            ${escapeHtml(item.signals)}
+          </span>
+
+          ${item.confidence !== null &&
+      item.confidence !== undefined &&
+      String(item.confidence).trim() !== ""
+      ? `
+                <span class="pill ${Number(item.confidence) >= 90
+        ? "green"
+        : "amber"
+      }">
+                  ${escapeHtml(item.confidence)}%
+                </span>
+              `
+      : ""
+    }
         </div>
       </div>
     </article>
