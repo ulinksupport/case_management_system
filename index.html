@@ -28,10 +28,10 @@
           <span class="nav-text">Master Cases</span>
           <span class="nav-count" id="navCaseCount">0</span>
         </button>
-        <button class="nav-item" data-view="unmatched" type="button">
-          <span class="nav-icon">?</span>
-          <span class="nav-text">Unmatched</span>
-          <span class="nav-count" id="navUnmatchedCount">0</span>
+        <button class="nav-item" data-view="velox" type="button">
+          <span class="nav-icon">V</span>
+          <span class="nav-text">Velox Transcripts</span>
+          <span class="nav-count" id="navVeloxCount">0</span>
         </button>
         <button class="nav-item" data-view="ingestion" type="button">
           <span class="nav-icon">⇅</span>
@@ -188,6 +188,67 @@
           </section>
         </section>
 
+        <section class="view" id="view-velox">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CALL TRANSCRIPTS</p>
+              <h1>Velox Transcripts</h1>
+              <p class="page-description">
+                Read-only call transcripts retrieved from the Operi drive.
+                Transcript files may be linked to Master Cases later.
+              </p>
+            </div>
+
+            <div class="last-updated">
+              <strong id="veloxSummary">0 transcripts</strong>
+              <br />
+              Read-only visibility
+            </div>
+          </div>
+
+          <div class="notice">
+            <span class="notice-icon">i</span>
+            <div>
+              Transcript filenames and extracted information are displayed as received.
+              No AI suggestions or external actions are available in this section.
+            </div>
+          </div>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Transcript Files</h2>
+                <p>Select one transcript to read its full content</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <input id="veloxSearch" type="search" placeholder="Search filename, participant, phone or email..." />
+
+              <span class="result-count">
+                <strong id="veloxCount">0</strong> transcripts shown
+              </span>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Original File</th>
+                    <th>Participant</th>
+                    <th>Phone / Email</th>
+                    <th>Call Date</th>
+                    <th>Linked Record</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+
+                <tbody id="veloxTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
         <section class="view" id="view-ingestion">
           <div class="page-heading">
             <div>
@@ -225,6 +286,48 @@
           </section>
         </section>
 
+        <section class="view" id="view-velox-detail">
+          <button class="back-button" id="veloxBackButton" type="button">
+            ← Back to Velox Transcripts
+          </button>
+
+          <section class="card case-hero" id="veloxHero"></section>
+
+          <div class="detail-grid">
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Call Transcript</h2>
+                  <p>Full text extracted from the Operi transcript file</p>
+                </div>
+
+                <span class="readonly-mini">
+                  Read-only
+                </span>
+              </div>
+
+              <div class="velox-transcript" id="veloxTranscriptContent">
+                <div class="empty-state">
+                  Select a transcript to view its content.
+                </div>
+              </div>
+            </section>
+
+            <aside class="side-stack">
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Transcript Record</h2>
+                    <p>Source file and available identifiers</p>
+                  </div>
+                </div>
+
+                <div class="record-list" id="veloxFileRecord"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+
         <section class="view" id="view-detail">
           <button class="back-button" id="backButton" type="button">← Back to Master Cases</button>
 
@@ -244,7 +347,7 @@
                     <button class="segment active" data-channel="all" type="button">All</button>
                     <button class="segment" data-channel="email" type="button">Email</button>
                     <button class="segment" data-channel="whatsapp" type="button">WhatsApp</button>
-                    <button class="segment" data-channel="document" type="button">Documents</button>
+                    <button class="segment" data-channel="velox" type="button">Operi Calls</button>
                   </div>
                   <span class="result-count"><strong id="timelineCount">0</strong> entries</span>
                 </div>

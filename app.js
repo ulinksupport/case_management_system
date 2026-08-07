@@ -388,6 +388,41 @@ const mockData = {
   ]
 };
 
+const mockVeloxTranscripts = [
+  {
+    id: "VX-PREVIEW-001",
+
+    fileName:
+      "operi-call-transcript-preview.txt",
+
+    participant: "",
+
+    phone: "",
+
+    email: "",
+
+    callDate: "",
+
+    linkedMasterCase: "",
+
+    linkedZohoTicket: "",
+
+    updatedAt:
+      "2026-08-06T09:00:00+08:00",
+
+    source: "Operi Drive",
+
+    transcript:
+      `Frontend preview only.
+
+The complete transcript text from Operi Drive will appear here after the n8n automation is connected.
+
+Participant, phone, email, call date, Zoho ticket and Master Case information will display when those fields are available.
+
+No AI suggestions will be generated for Velox transcripts.`
+  }
+];
+
 function cloneDummySnapshot(reason = "") {
   return {
     mode: "dummy",
@@ -994,6 +1029,14 @@ const state = {
   cases: [],
   unmatched: [],
   ingestion: [],
+
+  veloxTranscripts:
+    mockVeloxTranscripts.map(
+      (item) => ({ ...item })
+    ),
+
+  selectedVeloxId: null,
+
   selectedCaseId: null,
   activeTimelineChannel: "all",
   dataMode: "dummy",
@@ -1042,7 +1085,16 @@ const elements = {
   matchingTableBody: document.getElementById("matchingTableBody"),
   aiPanel: document.getElementById("aiPanel"),
   caseRecord: document.getElementById("caseRecord"),
-  matchingSummary: document.getElementById("matchingSummary")
+  matchingSummary: document.getElementById("matchingSummary"),
+  navVeloxCount: document.getElementById("navVeloxCount"),
+  veloxSummary: document.getElementById("veloxSummary"),
+  veloxSearch: document.getElementById("veloxSearch"),
+  veloxCount: document.getElementById("veloxCount"),
+  veloxTableBody: document.getElementById("veloxTableBody"),
+  veloxBackButton: document.getElementById("veloxBackButton"),
+  veloxHero: document.getElementById("veloxHero"),
+  veloxTranscriptContent: document.getElementById("veloxTranscriptContent"),
+  veloxFileRecord: document.getElementById("veloxFileRecord")
 };
 
 function escapeHtml(value) {
@@ -1052,6 +1104,51 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getVeloxValue(value) {
+  const normalized =
+    String(value ?? "").trim();
+
+  return normalized || "Not available";
+}
+
+function formatVeloxDate(value) {
+  const normalized =
+    String(value ?? "").trim();
+
+  if (!normalized) {
+    return "Not available";
+  }
+
+  const formatted =
+    formatTicketDate(normalized);
+
+  return formatted === "—"
+    ? "Not available"
+    : formatted;
+}
+
+function getVeloxPreview(
+  value,
+  limit = 130
+) {
+  const normalized =
+    String(value ?? "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (!normalized) {
+    return "Transcript content not available.";
+  }
+
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized
+    .slice(0, limit)
+    .trim()}…`;
 }
 
 function getLinkStatusLabel(matchState) {
@@ -1210,8 +1307,9 @@ function getChannelLabel(channel) {
   const labels = {
     email: "@",
     whatsapp: "WA",
-    document: "D"
+    velox: "V"
   };
+
   return labels[channel] ?? "?";
 }
 
@@ -1295,6 +1393,425 @@ function renderUnmatched() {
       <td>${escapeHtml(item.received)}</td>
     </tr>
   `).join("");
+}
+
+function renderVeloxTable() {
+  const query =
+    elements.veloxSearch
+      .value
+      .trim()
+      .toLowerCase();
+
+  const filtered =
+    state.veloxTranscripts.filter(
+      (item) => {
+        const searchable = [
+          item.id,
+          item.fileName,
+          item.participant,
+          item.phone,
+          item.email,
+          item.callDate,
+          item.linkedMasterCase,
+          item.linkedZohoTicket,
+          item.transcript
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return searchable.includes(query);
+      }
+    );
+
+  elements.navVeloxCount.textContent =
+    state.veloxTranscripts.length;
+
+  elements.veloxSummary.textContent =
+    `${state.veloxTranscripts.length} ` +
+    `transcript${state.veloxTranscripts.length === 1
+      ? ""
+      : "s"
+    }`;
+
+  elements.veloxCount.textContent =
+    filtered.length;
+
+  if (!filtered.length) {
+    elements.veloxTableBody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="empty-state">
+            No Velox transcripts match the current search.
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  elements.veloxTableBody.innerHTML =
+    filtered
+      .map((item) => {
+        const contact = [
+          String(item.phone ?? "").trim(),
+          String(item.email ?? "").trim()
+        ]
+          .filter(Boolean)
+          .join(" · ") ||
+          "Not available";
+
+        const linkedRecord = [
+          String(
+            item.linkedMasterCase ?? ""
+          ).trim(),
+
+          String(
+            item.linkedZohoTicket ?? ""
+          ).trim()
+        ]
+          .filter(Boolean)
+          .join(" · ") ||
+          "Not linked";
+
+        return `
+          <tr
+            data-velox-id="${escapeHtml(
+          item.id
+        )}"
+            tabindex="0"
+            role="button"
+          >
+            <td>
+              <div class="case-link">
+                ${escapeHtml(
+          getVeloxValue(
+            item.fileName
+          )
+        )}
+              </div>
+
+              <div class="secondary-text">
+                ${escapeHtml(
+          getVeloxPreview(
+            item.transcript
+          )
+        )}
+              </div>
+            </td>
+
+            <td>
+              <div class="primary-text">
+                ${escapeHtml(
+          getVeloxValue(
+            item.participant
+          )
+        )}
+              </div>
+
+              <div class="secondary-text">
+                ${escapeHtml(item.id)}
+              </div>
+            </td>
+
+            <td>
+              ${escapeHtml(contact)}
+            </td>
+
+            <td>
+              ${escapeHtml(
+          formatVeloxDate(
+            item.callDate
+          )
+        )}
+            </td>
+
+            <td>
+              <span class="pill ${linkedRecord ===
+            "Not linked"
+            ? "grey"
+            : "green"
+          }">
+                ${escapeHtml(
+            linkedRecord
+          )}
+              </span>
+            </td>
+
+            <td>
+              ${escapeHtml(
+            formatVeloxDate(
+              item.updatedAt
+            )
+          )}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+}
+
+function renderVeloxDetail(
+  transcript
+) {
+  state.selectedVeloxId =
+    transcript.id;
+
+  const isLinked =
+    Boolean(
+      String(
+        transcript.linkedMasterCase ??
+        ""
+      ).trim()
+    ) ||
+    Boolean(
+      String(
+        transcript.linkedZohoTicket ??
+        ""
+      ).trim()
+    );
+
+  elements.veloxHero.innerHTML = `
+    <div class="hero-top">
+      <div>
+        <div class="hero-title-row">
+          <h1>
+            ${escapeHtml(
+    getVeloxValue(
+      transcript.fileName
+    )
+  )}
+          </h1>
+
+          <span class="pill blue">
+            VELOX TRANSCRIPT
+          </span>
+
+          <span class="pill grey">
+            READ ONLY
+          </span>
+        </div>
+
+        <div class="hero-subtitle">
+          Velox record
+          <strong>
+            ${escapeHtml(
+    transcript.id
+  )}
+          </strong>
+          · Operi transcript file
+        </div>
+      </div>
+
+      <span class="pill ${isLinked
+      ? "green"
+      : "grey"
+    }">
+        ${isLinked
+      ? "Linked"
+      : "Not linked"
+    }
+      </span>
+    </div>
+
+    <div class="hero-grid">
+      <div>
+        <div class="info-label">
+          Participant
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      getVeloxValue(
+        transcript.participant
+      )
+    )}
+        </div>
+      </div>
+
+      <div>
+        <div class="info-label">
+          Phone
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      getVeloxValue(
+        transcript.phone
+      )
+    )}
+        </div>
+      </div>
+
+      <div>
+        <div class="info-label">
+          Email
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      getVeloxValue(
+        transcript.email
+      )
+    )}
+        </div>
+      </div>
+
+      <div>
+        <div class="info-label">
+          Call Date
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      formatVeloxDate(
+        transcript.callDate
+      )
+    )}
+        </div>
+      </div>
+
+      <div>
+        <div class="info-label">
+          Linked Master Case
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      getVeloxValue(
+        transcript.linkedMasterCase
+      )
+    )}
+        </div>
+      </div>
+
+      <div>
+        <div class="info-label">
+          Linked Zoho Ticket
+        </div>
+
+        <div class="info-value">
+          ${escapeHtml(
+      getVeloxValue(
+        transcript.linkedZohoTicket
+      )
+    )}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const transcriptText =
+    String(
+      transcript.transcript ?? ""
+    ).trim() ||
+    "Transcript content is not available.";
+
+  // textContent prevents transcript text
+  // from being interpreted as HTML.
+  elements.veloxTranscriptContent
+    .textContent = transcriptText;
+
+  const recordRows = [
+    [
+      "Original filename",
+      getVeloxValue(
+        transcript.fileName
+      )
+    ],
+    [
+      "Velox record ID",
+      getVeloxValue(
+        transcript.id
+      )
+    ],
+    [
+      "Source",
+      getVeloxValue(
+        transcript.source
+      )
+    ],
+    [
+      "Last updated",
+      formatVeloxDate(
+        transcript.updatedAt
+      )
+    ],
+    [
+      "Participant",
+      getVeloxValue(
+        transcript.participant
+      )
+    ],
+    [
+      "Phone",
+      getVeloxValue(
+        transcript.phone
+      )
+    ],
+    [
+      "Email",
+      getVeloxValue(
+        transcript.email
+      )
+    ],
+    [
+      "Call date",
+      formatVeloxDate(
+        transcript.callDate
+      )
+    ],
+    [
+      "Master Case",
+      getVeloxValue(
+        transcript.linkedMasterCase
+      )
+    ],
+    [
+      "Zoho ticket",
+      getVeloxValue(
+        transcript.linkedZohoTicket
+      )
+    ]
+  ];
+
+  elements.veloxFileRecord.innerHTML =
+    recordRows
+      .map(
+        ([label, value]) => `
+          <div class="record-row">
+            <span class="record-label">
+              ${escapeHtml(label)}
+            </span>
+
+            <span class="record-value">
+              ${escapeHtml(value)}
+            </span>
+          </div>
+        `
+      )
+      .join("");
+}
+
+function openVeloxTranscript(
+  veloxId
+) {
+  const transcript =
+    state.veloxTranscripts.find(
+      (item) =>
+        item.id === veloxId
+    );
+
+  if (!transcript) {
+    showToast(
+      "The selected transcript could not be found."
+    );
+
+    return;
+  }
+
+  renderVeloxDetail(transcript);
+  showView("velox-detail");
 }
 
 function renderIngestion() {
@@ -1483,6 +2000,55 @@ function getStrongIdentifiers(interaction, caseItem) {
   return "Case reference";
 }
 
+function formatTimelineContent(value) {
+  let text = String(value ?? "");
+
+  // Remove invisible / zero-width characters
+  // often found in newsletters and copied HTML.
+  text = text
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+
+  if (!text) {
+    return "No readable content was returned.";
+  }
+
+  // Preserve existing line breaks where available.
+  text = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]*\n[ \t]*/g, "\n");
+
+  // Add separation around common email sections.
+  text = text
+    .replace(
+      /\s+(?=(?:View in browser|Great news|What's On|For Enquiries|Follow us|If you wish to unsubscribe)\b)/gi,
+      "\n\n"
+    )
+    .replace(
+      /\s+(?=(?:Date|Promo code|Email|Phone|WhatsApp|Whats App|Contact Number|Company Name|Number of Participants|Preferred Activities)\s*:)/gi,
+      "\n"
+    )
+    .replace(
+      /\s+(?=Book here\b)/gi,
+      "\n"
+    );
+
+  // Break long plain-text email bodies into readable paragraphs.
+  if (!text.includes("\n\n")) {
+    text = text.replace(
+      /([.!?])\s+(?=[A-Z])/g,
+      "$1\n\n"
+    );
+  }
+
+  return text
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function renderTimeline(caseItem) {
   const interactions = sortInteractions(caseItem.interactions);
   const filtered = state.activeTimelineChannel === "all"
@@ -1506,7 +2072,9 @@ function renderTimeline(caseItem) {
           <span class="timeline-source">${escapeHtml(item.source)} · ${escapeHtml(item.id)}</span>
         </div>
         <div class="timeline-title">${escapeHtml(item.title)}</div>
-        <div class="timeline-preview">${escapeHtml(item.content)}</div>
+        <div class="timeline-preview">${escapeHtml(
+    formatTimelineContent(item.content)
+  )}</div>
         ${item.attachments.length ? `<div class="attachment-list">${item.attachments.map((file) => `<span class="attachment-chip">${escapeHtml(file)}</span>`).join("")}</div>` : ""}
         <div class="match-line">
           <span class="match-signals">
@@ -1536,8 +2104,9 @@ function formatChannelName(channel) {
   const names = {
     email: "Email",
     whatsapp: "WhatsApp",
-    document: "Document"
+    velox: "Velox"
   };
+
   return names[channel] ?? channel;
 }
 
@@ -1738,6 +2307,18 @@ function bindEvents() {
 
   elements.backButton.addEventListener("click", () => showView("cases"));
 
+  elements.veloxBackButton
+    .addEventListener(
+      "click",
+      () => showView("velox")
+    );
+
+  elements.veloxSearch
+    .addEventListener(
+      "input",
+      renderVeloxTable
+    );
+
   elements.caseSearch.addEventListener("input", renderCaseTable);
   elements.caseTypeFilter.addEventListener("change", renderCaseTable);
   elements.matchFilter.addEventListener("change", renderCaseTable);
@@ -1746,24 +2327,62 @@ function bindEvents() {
     if (event.key === "Enter") handleGlobalSearch();
   });
 
-  document.addEventListener("click", (event) => {
-    const caseTarget = event.target.closest("[data-case-id]");
-    if (caseTarget) openCase(caseTarget.dataset.caseId);
+  document.addEventListener(
+    "click",
+    (event) => {
+      const veloxTarget =
+        event.target.closest(
+          "[data-velox-id]"
+        );
 
-    const tab = event.target.closest(".tab");
-    if (tab) activateTab(tab.dataset.tab);
+      if (veloxTarget) {
+        openVeloxTranscript(
+          veloxTarget.dataset.veloxId
+        );
 
-    const segment = event.target.closest("#timelineFilters .segment");
-    if (segment && state.selectedCaseId) {
-      document.querySelectorAll("#timelineFilters .segment").forEach((item) => item.classList.remove("active"));
-      segment.classList.add("active");
-      state.activeTimelineChannel = segment.dataset.channel;
-      const selectedCase = state.cases.find((item) => item.id === state.selectedCaseId);
-      if (selectedCase) renderTimeline(selectedCase);
-    }
-  });
+        return;
+      }
+
+      const caseTarget =
+        event.target.closest(
+          "[data-case-id]"
+        );
+      if (caseTarget) openCase(caseTarget.dataset.caseId);
+
+      const tab = event.target.closest(".tab");
+      if (tab) activateTab(tab.dataset.tab);
+
+      const segment = event.target.closest("#timelineFilters .segment");
+      if (segment && state.selectedCaseId) {
+        document.querySelectorAll("#timelineFilters .segment").forEach((item) => item.classList.remove("active"));
+        segment.classList.add("active");
+        state.activeTimelineChannel = segment.dataset.channel;
+        const selectedCase = state.cases.find((item) => item.id === state.selectedCaseId);
+        if (selectedCase) renderTimeline(selectedCase);
+      }
+    });
 
   document.addEventListener("keydown", (event) => {
+    const veloxTarget =
+      event.target.closest?.(
+        "[data-velox-id]"
+      );
+
+    if (
+      veloxTarget &&
+      (
+        event.key === "Enter" ||
+        event.key === " "
+      )
+    ) {
+      event.preventDefault();
+
+      openVeloxTranscript(
+        veloxTarget.dataset.veloxId
+      );
+
+      return;
+    }
     if (event.key === "Escape") elements.sidebar.classList.remove("open");
     const target = event.target.closest?.("[data-case-id]");
     if (target && (event.key === "Enter" || event.key === " ")) {
@@ -1786,6 +2405,7 @@ function renderDashboard() {
   renderSourceHealth();
   renderCaseTable();
   renderUnmatched();
+  renderVeloxTable();
   renderIngestion();
 
   if (state.selectedCaseId) {

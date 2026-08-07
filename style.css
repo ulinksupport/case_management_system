@@ -50,7 +50,8 @@ button {
 }
 
 button,
-tr[data-case-id] {
+tr[data-case-id],
+tr[data-velox-id] {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -630,12 +631,14 @@ td {
   font-size: 10px;
 }
 
-tbody tr[data-case-id] {
+tbody tr[data-case-id],
+tbody tr[data-velox-id] {
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-tbody tr[data-case-id]:hover {
+tbody tr[data-case-id]:hover,
+tbody tr[data-velox-id]:hover {
   background: #f8fbfd;
 }
 
@@ -918,9 +921,9 @@ tbody tr:last-child td {
   background: #e6f7ef;
 }
 
-.timeline-node.document {
-  color: #9a6400;
-  background: #fff2d3;
+.timeline-node.velox {
+  color: #6d56b5;
+  background: #f0ecff;
 }
 
 .timeline-card {
@@ -959,10 +962,12 @@ tbody tr:last-child td {
 }
 
 .timeline-preview {
-  margin-top: 5px;
+  margin-top: 8px;
   color: #465164;
-  font-size: 9px;
-  line-height: 1.55;
+  font-size: 10px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .attachment-list {
@@ -1118,6 +1123,22 @@ tbody tr:last-child td {
   line-height: 1.5;
 }
 
+.velox-transcript {
+  min-height: 420px;
+  padding: 20px;
+  overflow-wrap: anywhere;
+  color: #374355;
+  background: #ffffff;
+  font-size: 11px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+tr[data-velox-id] .secondary-text {
+  max-width: 440px;
+  line-height: 1.5;
+}
+
 .empty-state {
   padding: 32px 18px;
   color: var(--muted);
@@ -1248,5 +1269,10 @@ tbody tr:last-child td {
   .result-count {
     width: 100%;
     margin-left: 0;
+  }
+
+  .velox-transcript {
+    min-height: 300px;
+    padding: 15px;
   }
 }
