@@ -16,7 +16,8 @@ const apiBaseUrl =
 const appConfig = {
   endpoints: {
     zohoTickets: "/webhook/zoho-tickets-feed",
-    zohoTicketDetail: "/webhook/zoho-ticket-detail"
+    zohoTicketDetail: "/webhook/zoho-ticket-detail",
+    veloxTranscripts: "/webhook/velox-transcripts-feed"
   },
   zohoRefreshIntervalMs: 15000
 };
@@ -387,41 +388,6 @@ const mockData = {
     }
   ]
 };
-
-const mockVeloxTranscripts = [
-  {
-    id: "VX-PREVIEW-001",
-
-    fileName:
-      "operi-call-transcript-preview.txt",
-
-    participant: "",
-
-    phone: "",
-
-    email: "",
-
-    callDate: "",
-
-    linkedMasterCase: "",
-
-    linkedZohoTicket: "",
-
-    updatedAt:
-      "2026-08-06T09:00:00+08:00",
-
-    source: "Operi Drive",
-
-    transcript:
-      `Frontend preview only.
-
-The complete transcript text from Operi Drive will appear here after the n8n automation is connected.
-
-Participant, phone, email, call date, Zoho ticket and Master Case information will display when those fields are available.
-
-No AI suggestions will be generated for Velox transcripts.`
-  }
-];
 
 function cloneDummySnapshot(reason = "") {
   return {
@@ -802,6 +768,128 @@ async function fetchZohoSnapshot() {
   }
 }
 
+async function fetchVeloxTranscripts() {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    30000
+  );
+
+  try {
+    const response = await fetch(
+      buildApiUrl(
+        appConfig.endpoints.veloxTranscripts
+      ),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Velox feed returned HTTP ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+
+    const root = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (
+      !root?.success ||
+      !Array.isArray(root.transcripts)
+    ) {
+      throw new Error(
+        "Velox response did not contain a transcripts array."
+      );
+    }
+
+    return root.transcripts
+      .map((item) => ({
+        id:
+          String(item.id ?? "").trim(),
+
+        fileName:
+          String(item.fileName ?? "").trim(),
+
+        filePath:
+          String(item.filePath ?? "").trim(),
+
+        participant:
+          String(item.participant ?? "").trim(),
+
+        phone:
+          String(item.phone ?? "").trim(),
+
+        email:
+          String(item.email ?? "").trim(),
+
+        callDate:
+          String(item.callDate ?? "").trim(),
+
+        linkedMasterCase:
+          String(
+            item.linkedMasterCase ?? ""
+          ).trim(),
+
+        linkedZohoTicket:
+          String(
+            item.linkedZohoTicket ?? ""
+          ).trim(),
+
+        updatedAt:
+          String(item.updatedAt ?? "").trim(),
+
+        source:
+          String(
+            item.source ?? "Operi"
+          ).trim(),
+
+        transcript:
+          String(
+            item.transcript ?? ""
+          ).trim(),
+
+        pdfPages:
+          item.pdfPages ?? null,
+
+        linkStatus:
+          String(
+            item.linkStatus ??
+            "not_evaluated"
+          ).trim()
+      }))
+      .filter(
+        (item) =>
+          item.id &&
+          item.fileName
+      )
+      .sort((a, b) => {
+        const aTime =
+          new Date(
+            a.updatedAt || 0
+          ).getTime();
+
+        const bTime =
+          new Date(
+            b.updatedAt || 0
+          ).getTime();
+
+        return bTime - aTime;
+      });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function mapZohoDetailEventToInteraction(event) {
   const eventType = String(
     event.eventType ?? ""
@@ -1030,11 +1118,7 @@ const state = {
   unmatched: [],
   ingestion: [],
 
-  veloxTranscripts:
-    mockVeloxTranscripts.map(
-      (item) => ({ ...item })
-    ),
-
+  veloxTranscripts: [],
   selectedVeloxId: null,
 
   selectedCaseId: null,
@@ -1379,8 +1463,13 @@ function renderCaseTable() {
 }
 
 function renderUnmatched() {
-  elements.navUnmatchedCount.textContent = state.unmatched.length;
-  elements.unmatchedSummary.textContent = `${state.unmatched.length} items`;
+  if (elements.navUnmatchedCount) {
+    elements.navUnmatchedCount.textContent =
+      state.unmatched.length;
+  }
+
+  elements.unmatchedSummary.textContent =
+    `${state.unmatched.length} items`;
 
   elements.unmatchedTableBody.innerHTML = state.unmatched.map((item) => `
     <tr>
@@ -1549,6 +1638,46 @@ function renderVeloxTable() {
         `;
       })
       .join("");
+}
+
+async function refreshVeloxData() {
+  try {
+    const transcripts =
+      await fetchVeloxTranscripts();
+
+    state.veloxTranscripts =
+      transcripts;
+
+    renderVeloxTable();
+  } catch (error) {
+    console.error(
+      "Velox transcript feed unavailable:",
+      error
+    );
+
+    if (
+      state.veloxTranscripts.length === 0
+    ) {
+      elements.navVeloxCount.textContent =
+        "0";
+
+      elements.veloxSummary.textContent =
+        "Velox unavailable";
+
+      elements.veloxCount.textContent =
+        "0";
+
+      elements.veloxTableBody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              Unable to load Velox transcripts from Operi.
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  }
 }
 
 function renderVeloxDetail(
@@ -2298,7 +2427,16 @@ function handleGlobalSearch() {
 
 function bindEvents() {
   document.querySelectorAll(".nav-item").forEach((item) => {
-    item.addEventListener("click", () => showView(item.dataset.view));
+    item.addEventListener("click", () => {
+      const viewName =
+        item.dataset.view;
+
+      showView(viewName);
+
+      if (viewName === "velox") {
+        refreshVeloxData();
+      }
+    });
   });
 
   elements.menuButton.addEventListener("click", () => {
@@ -2568,7 +2706,9 @@ async function refreshDashboardData() {
 async function initializeDashboard() {
   try {
     bindEvents();
+
     await refreshDashboardData();
+    await refreshVeloxData();
 
     window.setInterval(() => {
       if (document.hidden) {
