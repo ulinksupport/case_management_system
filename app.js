@@ -935,19 +935,52 @@ function mapZohoDetailEventToInteraction(event) {
     fallbackTitle = "Incoming email";
   }
 
-  const attachmentNames = Array.isArray(
+  const attachmentFiles = Array.isArray(
     event.attachments
   )
     ? event.attachments
-      .map((file) =>
-        String(
-          file?.name ??
-          file?.fileName ??
-          ""
-        ).trim()
-      )
-      .filter(Boolean)
+      .map((file) => ({
+        name:
+          String(
+            file?.name ??
+            file?.fileName ??
+            "Unnamed file"
+          ).trim(),
+
+        id:
+          String(
+            file?.id ??
+            file?.attachmentId ??
+            ""
+          ).trim(),
+
+        contentType:
+          String(
+            file?.contentType ??
+            file?.mimeType ??
+            ""
+          ).trim(),
+
+        size:
+          file?.size ??
+          file?.fileSize ??
+          null,
+
+        url:
+          String(
+            file?.downloadUrl ??
+            file?.url ??
+            file?.href ??
+            ""
+          ).trim()
+      }))
+      .filter((file) => file.name)
     : [];
+
+  const attachmentNames =
+    attachmentFiles.map(
+      (file) => file.name
+    );
 
   return {
     id: String(event.id ?? ""),
@@ -1003,7 +1036,8 @@ function mapZohoDetailEventToInteraction(event) {
         ? "Outgoing Zoho Desk email"
         : "Incoming Zoho Desk email",
 
-    attachments: attachmentNames
+    attachments: attachmentNames,
+    attachmentFiles
   };
 }
 
@@ -1169,7 +1203,15 @@ const elements = {
   matchingTableBody: document.getElementById("matchingTableBody"),
   aiPanel: document.getElementById("aiPanel"),
   caseRecord: document.getElementById("caseRecord"),
-  matchingSummary: document.getElementById("matchingSummary"),
+
+  caseMediaList:
+    document.getElementById("caseMediaList"),
+
+  caseMediaCount:
+    document.getElementById("caseMediaCount"),
+
+  matchingSummary:
+    document.getElementById("matchingSummary"),
   navVeloxCount: document.getElementById("navVeloxCount"),
   veloxSummary: document.getElementById("veloxSummary"),
   veloxSearch: document.getElementById("veloxSearch"),
@@ -1976,6 +2018,329 @@ function sortInteractions(interactions) {
   return [...interactions].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
 
+function getMediaType(fileName, contentType = "") {
+  const name =
+    String(fileName ?? "")
+      .toLowerCase();
+
+  const mime =
+    String(contentType ?? "")
+      .toLowerCase();
+
+  if (
+    mime.startsWith("image/") ||
+    /\.(jpg|jpeg|png|gif|webp|bmp|heic)$/i.test(name)
+  ) {
+    return "Image";
+  }
+
+  if (
+    mime.startsWith("video/") ||
+    /\.(mp4|mov|avi|mkv|webm)$/i.test(name)
+  ) {
+    return "Video";
+  }
+
+  if (
+    mime.startsWith("audio/") ||
+    /\.(mp3|wav|m4a|aac|ogg)$/i.test(name)
+  ) {
+    return "Audio";
+  }
+
+  if (
+    mime.includes("pdf") ||
+    /\.pdf$/i.test(name)
+  ) {
+    return "PDF";
+  }
+
+  if (
+    /\.(doc|docx)$/i.test(name)
+  ) {
+    return "Word";
+  }
+
+  if (
+    /\.(xls|xlsx|csv)$/i.test(name)
+  ) {
+    return "Spreadsheet";
+  }
+
+  return "Document";
+}
+
+
+function collectCaseMedia(caseItem) {
+  const files = [];
+
+  for (
+    const interaction of
+    caseItem.interactions ?? []
+  ) {
+    const detailedFiles =
+      Array.isArray(
+        interaction.attachmentFiles
+      )
+        ? interaction.attachmentFiles
+        : [];
+
+    if (detailedFiles.length) {
+      for (const file of detailedFiles) {
+        files.push({
+          name:
+            String(
+              file.name ??
+              "Unnamed file"
+            ),
+
+          id:
+            String(
+              file.id ?? ""
+            ),
+
+          url:
+            String(
+              file.url ?? ""
+            ),
+
+          contentType:
+            String(
+              file.contentType ?? ""
+            ),
+
+          size:
+            file.size ?? null,
+
+          ticketId:
+            String(
+              caseItem.zohoTicketId ?? ""
+            ),
+
+          parentId:
+            String(
+              interaction.id ?? ""
+            ),
+
+          parentType:
+            interaction.eventType === "comment"
+              ? "comment"
+              : "thread",
+
+          type:
+            getMediaType(
+              file.name,
+              file.contentType
+            ),
+
+          interactionId:
+            interaction.id ?? "",
+
+          source:
+            interaction.source ??
+            "Zoho Desk",
+
+          timestamp:
+            interaction.timestamp ??
+            ""
+        });
+      }
+
+      continue;
+    }
+
+    /*
+      Backward compatibility for records where
+      only attachment filenames are available.
+    */
+    const attachmentNames =
+      Array.isArray(
+        interaction.attachments
+      )
+        ? interaction.attachments
+        : [];
+
+    for (const name of attachmentNames) {
+      files.push({
+        name: String(name),
+        id: "",
+        url: "",
+        contentType: "",
+        size: null,
+
+        type:
+          getMediaType(name),
+
+        interactionId:
+          interaction.id ?? "",
+
+        source:
+          interaction.source ??
+          "Zoho Desk",
+
+        timestamp:
+          interaction.timestamp ??
+          ""
+      });
+    }
+  }
+
+  return files;
+}
+
+function openCaseMedia(file) {
+  if (
+    !file.ticketId ||
+    !file.parentId ||
+    !file.id
+  ) {
+    showToast(
+      "This attachment does not have enough information to open."
+    );
+
+    return;
+  }
+
+  const params =
+    new URLSearchParams({
+      ticketId:
+        file.ticketId,
+
+      mode:
+        "attachment",
+
+      parentType:
+        file.parentType,
+
+      parentId:
+        file.parentId,
+
+      attachmentId:
+        file.id,
+
+      fileName:
+        file.name
+    });
+
+  const url =
+    buildApiUrl(
+      appConfig.endpoints
+        .zohoTicketDetail
+    ) +
+    `?${params.toString()}`;
+
+  window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
+function renderCaseMedia(caseItem) {
+  const files =
+    collectCaseMedia(caseItem);
+
+  elements.caseMediaCount.textContent =
+    `${files.length} file${files.length === 1
+      ? ""
+      : "s"
+    }`;
+
+  if (!files.length) {
+    elements.caseMediaList.innerHTML = `
+      <div class="empty-state">
+        No documents or media were found
+        in this Master Case.
+      </div>
+    `;
+
+    return;
+  }
+
+  elements.caseMediaList.innerHTML =
+    files
+      .map((file) => `
+        <div class="media-item">
+          <div class="media-file-icon">
+            ${escapeHtml(
+        getMediaIcon(file.type)
+      )}
+          </div>
+
+          <div class="media-file-info">
+            <div class="media-file-name">
+              ${escapeHtml(file.name)}
+            </div>
+
+            <div class="media-file-meta">
+              ${escapeHtml(file.type)}
+              ·
+              ${escapeHtml(
+        file.source ||
+        "Zoho Desk"
+      )}
+            </div>
+
+            ${file.timestamp
+          ? `
+                  <div class="media-file-meta">
+                    ${escapeHtml(
+            formatTicketDate(
+              file.timestamp
+            )
+          )}
+                  </div>
+                `
+          : ""
+        }
+          </div>
+
+          <button
+  class="media-view-button"
+  type="button"
+
+  data-media-ticket-id="${escapeHtml(
+          file.ticketId
+        )}"
+
+  data-media-parent-type="${escapeHtml(
+          file.parentType
+        )}"
+
+  data-media-parent-id="${escapeHtml(
+          file.parentId
+        )}"
+
+  data-media-attachment-id="${escapeHtml(
+          file.id
+        )}"
+
+  data-media-file-name="${escapeHtml(
+          file.name
+        )}"
+>
+  View
+</button>
+        </div>
+      `)
+      .join("");
+}
+
+
+function getMediaIcon(type) {
+  const icons = {
+    PDF: "PDF",
+    Image: "IMG",
+    Video: "VID",
+    Audio: "AUD",
+    Word: "DOC",
+    Spreadsheet: "XLS",
+    Document: "FILE"
+  };
+
+  return icons[type] ?? "FILE";
+}
+
 function renderCaseDetail(caseItem) {
   const isRefreshingSameCase =
     state.selectedCaseId === caseItem.id;
@@ -2080,12 +2445,22 @@ function renderCaseDetail(caseItem) {
     ["Linked Tickets", caseItem.tickets.length]
   ];
 
-  elements.caseRecord.innerHTML = recordRows.map(([label, value]) => `
-    <div class="record-row">
-      <span class="record-label">${escapeHtml(label)}</span>
-      <span class="record-value">${escapeHtml(value)}</span>
-    </div>
-  `).join("");
+  elements.caseRecord.innerHTML =
+    recordRows
+      .map(([label, value]) => `
+      <div class="record-row">
+        <span class="record-label">
+          ${escapeHtml(label)}
+        </span>
+
+        <span class="record-value">
+          ${escapeHtml(value)}
+        </span>
+      </div>
+    `)
+      .join("");
+
+  renderCaseMedia(caseItem);
 
   elements.matchingSummary.innerHTML = caseItem.matchingSummary.map((item) => `
     <div class="match-box">
@@ -2468,6 +2843,38 @@ function bindEvents() {
   document.addEventListener(
     "click",
     (event) => {
+
+      const mediaButton =
+        event.target.closest(
+          ".media-view-button"
+        );
+
+      if (mediaButton) {
+        openCaseMedia({
+          ticketId:
+            mediaButton.dataset
+              .mediaTicketId,
+
+          parentType:
+            mediaButton.dataset
+              .mediaParentType,
+
+          parentId:
+            mediaButton.dataset
+              .mediaParentId,
+
+          id:
+            mediaButton.dataset
+              .mediaAttachmentId,
+
+          name:
+            mediaButton.dataset
+              .mediaFileName
+        });
+
+        return;
+      }
+
       const veloxTarget =
         event.target.closest(
           "[data-velox-id]"
