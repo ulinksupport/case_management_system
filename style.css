@@ -1215,19 +1215,42 @@ tr[data-velox-id] .secondary-text {
 }
 
 .media-view-button {
-  min-width: 48px;
-  padding: 6px 9px;
-  border: 1px solid #cbe8ef;
+  min-width: 52px;
+  padding: 7px 11px;
+  border: 1px solid #9fd3df;
   border-radius: 7px;
+
   color: var(--brand);
   background: var(--brand-soft);
-  font-size: 8px;
+
+  cursor: pointer;
+
+  font-size: 9px;
   font-weight: 800;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
 }
 
-.media-view-button:disabled {
-  cursor: default;
-  opacity: 0.72;
+.media-view-button:hover {
+  border-color: var(--brand);
+  background: #ffffff;
+
+  box-shadow: 0 3px 8px rgba(18, 111, 146, 0.14);
+  transform: translateY(-1px);
+}
+
+.media-view-button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.media-view-button:focus-visible {
+  outline: 3px solid rgba(18, 111, 146, 0.2);
+  outline-offset: 2px;
 }
 
 .empty-state {
