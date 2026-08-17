@@ -970,6 +970,32 @@ tbody tr:last-child td {
   overflow-wrap: anywhere;
 }
 
+.timeline-preview-collapsed {
+  position: relative;
+  max-height: calc(1.7em * 3);
+  overflow: hidden;
+}
+
+.timeline-preview-collapsed.expanded {
+  max-height: none;
+  overflow: visible;
+}
+
+.timeline-read-more {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  color: var(--brand);
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.timeline-read-more:hover {
+  text-decoration: underline;
+}
+
 .attachment-list {
   display: flex;
   flex-wrap: wrap;

@@ -2575,11 +2575,49 @@ function renderTimeline(caseItem) {
           <span class="timeline-time">${escapeHtml(item.time)}</span>
           <span class="timeline-source">${escapeHtml(item.source)} · ${escapeHtml(item.id)}</span>
         </div>
-        <div class="timeline-title">${escapeHtml(item.title)}</div>
-        <div class="timeline-preview">${escapeHtml(
-    formatTimelineContent(item.content)
-  )}</div>
-        ${item.attachments.length ? `<div class="attachment-list">${item.attachments.map((file) => `<span class="attachment-chip">${escapeHtml(file)}</span>`).join("")}</div>` : ""}
+        <div class="timeline-title">
+  ${escapeHtml(item.title)}
+</div>
+
+<div
+  class="timeline-preview ${item.channel === "email"
+      ? "timeline-preview-collapsed"
+      : ""
+    }"
+>
+  ${escapeHtml(
+      formatTimelineContent(item.content)
+    )}
+</div>
+
+${item.channel === "email"
+      ? `
+      <button
+        class="timeline-read-more"
+        type="button"
+      >
+        Read more
+      </button>
+    `
+      : ""
+    }
+
+${item.attachments.length
+      ? `
+      <div class="attachment-list">
+        ${item.attachments
+        .map(
+          (file) => `
+              <span class="attachment-chip">
+                ${escapeHtml(file)}
+              </span>
+            `
+        )
+        .join("")}
+      </div>
+    `
+      : ""
+    }
         <div class="match-line">
           <span class="match-signals">
             ${escapeHtml(item.signals)}
@@ -2602,6 +2640,35 @@ function renderTimeline(caseItem) {
       </div>
     </article>
   `).join("");
+
+  elements.timelineContainer
+    .querySelectorAll(
+      ".timeline-preview-collapsed"
+    )
+    .forEach((preview) => {
+      const button =
+        preview.nextElementSibling;
+
+      if (
+        !button ||
+        !button.classList.contains(
+          "timeline-read-more"
+        )
+      ) {
+        return;
+      }
+
+      /*
+        Hide Read more when the email
+        already fits within 3 lines.
+      */
+      if (
+        preview.scrollHeight <=
+        preview.clientHeight + 2
+      ) {
+        button.hidden = true;
+      }
+    });
 }
 
 function formatChannelName(channel) {
@@ -2843,6 +2910,36 @@ function bindEvents() {
   document.addEventListener(
     "click",
     (event) => {
+
+      const readMoreButton =
+        event.target.closest(
+          ".timeline-read-more"
+        );
+
+      if (readMoreButton) {
+        const preview =
+          readMoreButton
+            .previousElementSibling;
+
+        if (
+          preview &&
+          preview.classList.contains(
+            "timeline-preview"
+          )
+        ) {
+          const isExpanded =
+            preview.classList.toggle(
+              "expanded"
+            );
+
+          readMoreButton.textContent =
+            isExpanded
+              ? "Show less"
+              : "Read more";
+        }
+
+        return;
+      }
 
       const mediaButton =
         event.target.closest(
