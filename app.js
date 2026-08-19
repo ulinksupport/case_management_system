@@ -820,6 +820,11 @@ async function fetchVeloxTranscripts() {
         fileName:
           String(item.fileName ?? "").trim(),
 
+        turboScribeZipName:
+          String(
+            item.turboScribeZipName ?? ""
+          ).trim(),
+
         filePath:
           String(item.filePath ?? "").trim(),
 
@@ -850,7 +855,7 @@ async function fetchVeloxTranscripts() {
 
         source:
           String(
-            item.source ?? "Operi"
+            item.source ?? "TurboScribe"
           ).trim(),
 
         transcript:
@@ -1255,6 +1260,72 @@ function formatVeloxDate(value) {
     : formatted;
 }
 
+function formatVeloxTranscript(value) {
+  const text = String(value ?? "").trim();
+
+  if (!text) {
+    return `
+      <div class="velox-speaker-text">
+        Transcript content is not available.
+      </div>
+    `;
+  }
+
+  const pattern =
+    /(\[Speaker\s+\d+\])/g;
+
+  const parts =
+    text.split(pattern);
+
+  const blocks = [];
+
+  for (
+    let i = 0;
+    i < parts.length;
+    i++
+  ) {
+    const part =
+      String(parts[i] ?? "").trim();
+
+    if (!part) {
+      continue;
+    }
+
+    if (
+      /^\[Speaker\s+\d+\]$/.test(part)
+    ) {
+      const content =
+        String(
+          parts[i + 1] ?? ""
+        ).trim();
+
+      blocks.push(`
+        <div class="velox-speaker-block">
+          <div class="velox-speaker-label">
+            ${escapeHtml(part)}
+          </div>
+
+          <div class="velox-speaker-text">
+            ${escapeHtml(content)}
+          </div>
+        </div>
+      `);
+
+      i++;
+    } else {
+      blocks.push(`
+        <div class="velox-speaker-block">
+          <div class="velox-speaker-text">
+            ${escapeHtml(part)}
+          </div>
+        </div>
+      `);
+    }
+  }
+
+  return blocks.join("");
+}
+
 function getVeloxPreview(
   value,
   limit = 130
@@ -1539,6 +1610,7 @@ function renderVeloxTable() {
         const searchable = [
           item.id,
           item.fileName,
+          item.turboScribeZipName,
           item.participant,
           item.phone,
           item.email,
@@ -1615,6 +1687,14 @@ function renderVeloxTable() {
           >
             <td>
               <div class="case-link">
+                ${escapeHtml(
+          getVeloxValue(
+            item.turboScribeZipName
+          )
+        )}
+              </div>
+
+              <div class="primary-text">
                 ${escapeHtml(
           getVeloxValue(
             item.fileName
@@ -1749,7 +1829,7 @@ function renderVeloxDetail(
           <h1>
             ${escapeHtml(
     getVeloxValue(
-      transcript.fileName
+      transcript.turboScribeZipName
     )
   )}
           </h1>
@@ -1764,13 +1844,15 @@ function renderVeloxDetail(
         </div>
 
         <div class="hero-subtitle">
-          Velox record
-          <strong>
-            ${escapeHtml(
-    transcript.id
+  TXT file
+  <strong>
+          ${escapeHtml(
+    getVeloxValue(
+      transcript.fileName
+    )
   )}
           </strong>
-          · Operi transcript file
+          · TurboScribe transcript
         </div>
       </div>
 
@@ -1878,14 +1960,20 @@ function renderVeloxDetail(
     ).trim() ||
     "Transcript content is not available.";
 
-  // textContent prevents transcript text
-  // from being interpreted as HTML.
-  elements.veloxTranscriptContent
-    .textContent = transcriptText;
+  elements.veloxTranscriptContent.innerHTML =
+    formatVeloxTranscript(
+      transcriptText
+    );
 
   const recordRows = [
     [
-      "Original filename",
+      "TurboScribe export",
+      getVeloxValue(
+        transcript.turboScribeZipName
+      )
+    ],
+    [
+      "TXT filename",
       getVeloxValue(
         transcript.fileName
       )
