@@ -880,12 +880,16 @@ async function fetchVeloxTranscripts() {
       .sort((a, b) => {
         const aTime =
           new Date(
-            a.updatedAt || 0
+            a.callDate ||
+            a.updatedAt ||
+            0
           ).getTime();
 
         const bTime =
           new Date(
-            b.updatedAt || 0
+            b.callDate ||
+            b.updatedAt ||
+            0
           ).getTime();
 
         return bTime - aTime;
@@ -1258,6 +1262,31 @@ function formatVeloxDate(value) {
   return formatted === "—"
     ? "Not available"
     : formatted;
+}
+
+function formatVeloxCallDate(value) {
+  const normalized =
+    String(value ?? "").trim();
+
+  if (!normalized) {
+    return "Not available";
+  }
+
+  const date =
+    new Date(`${normalized}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-SG",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }
+  ).format(date);
 }
 
 function formatVeloxTranscript(value) {
@@ -1731,7 +1760,7 @@ function renderVeloxTable() {
 
             <td>
               ${escapeHtml(
-          formatVeloxDate(
+          formatVeloxCallDate(
             item.callDate
           )
         )}
@@ -1917,7 +1946,7 @@ function renderVeloxDetail(
 
         <div class="info-value">
           ${escapeHtml(
-      formatVeloxDate(
+      formatVeloxCallDate(
         transcript.callDate
       )
     )}
@@ -2016,7 +2045,7 @@ function renderVeloxDetail(
     ],
     [
       "Call date",
-      formatVeloxDate(
+      formatVeloxCallDate(
         transcript.callDate
       )
     ],
