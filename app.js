@@ -15,10 +15,19 @@ const apiBaseUrl =
 
 const appConfig = {
   endpoints: {
-    zohoTickets: "/webhook/zoho-tickets-feed",
-    zohoTicketDetail: "/webhook/zoho-ticket-detail",
-    veloxTranscripts: "/webhook/velox-transcripts-feed"
+    zohoTickets:
+      "/webhook/zoho-tickets-feed",
+
+    zohoTicketDetail:
+      "/webhook/zoho-ticket-detail",
+
+    veloxTranscripts:
+      "/webhook/velox-transcripts-feed",
+
+    veloxManualLink:
+      "/webhook/manually-link-case"
   },
+
   zohoRefreshIntervalMs: 15000
 };
 
@@ -1554,6 +1563,25 @@ function renderCaseTable() {
   const type = elements.caseTypeFilter.value;
   const match = elements.matchFilter.value;
 
+  const linkedMasterCaseIds =
+    new Set(
+      state.veloxTranscripts
+        .filter(
+          (transcript) =>
+            String(
+              transcript.linkStatus || ""
+            ).toLowerCase() === "linked"
+        )
+        .map(
+          (transcript) =>
+            String(
+              transcript.linkedMasterCase ||
+              ""
+            ).trim()
+        )
+        .filter(Boolean)
+    );
+
   const filtered = state.cases.filter((item) => {
     const searchable = [
       item.id,
@@ -1577,7 +1605,26 @@ function renderCaseTable() {
     return;
   }
 
-  elements.caseTableBody.innerHTML = filtered.map((item) => `
+  elements.caseTableBody.innerHTML =
+    filtered.map((item) => {
+      const hasOperiLink =
+        linkedMasterCaseIds.has(
+          String(item.id || "").trim()
+        );
+
+      const displayLinkText =
+        hasOperiLink
+          ? "Linked"
+          : getLinkStatusText(item);
+
+      const displayLinkClass =
+        hasOperiLink
+          ? "green"
+          : getLinkStatusClass(
+            item.matchState
+          );
+
+      return `
     <tr data-case-id="${escapeHtml(item.id)}">
       <td>
         <div class="case-link">${escapeHtml(item.id)} <span class="pill ${item.isDummy ? "amber" : "green"}">${item.isDummy ? "DUMMY" : "LIVE"}</span></div>
@@ -1602,16 +1649,16 @@ function renderCaseTable() {
         <div class="secondary-text">${escapeHtml(item.latestInteractionNote)}</div>
       </td>
       <td>
-  <span class="pill ${getLinkStatusClass(item.matchState)}">
-    ${escapeHtml(getLinkStatusText(item))}
-  </span>
-</td>
+        <span class="pill ${displayLinkClass}">
+        ${escapeHtml(displayLinkText)}
+        </span>
+      </td>
       <td>
         <div class="primary-text">${escapeHtml(item.updatedAt)}</div>
         <div class="secondary-text">${escapeHtml(item.updatedTime)}</div>
       </td>
     </tr>
-  `).join("");
+  `}).join("");
 }
 
 function renderUnmatched() {
@@ -1856,6 +1903,168 @@ async function refreshVeloxData() {
   }
 }
 
+async function submitManualVeloxLink(
+  veloxId,
+  caseId
+) {
+  const transcript =
+    state.veloxTranscripts.find(
+      (item) =>
+        item.id === veloxId
+    );
+
+  const caseItem =
+    state.cases.find(
+      (item) =>
+        item.id === caseId
+    );
+
+  if (!transcript) {
+    throw new Error(
+      "Velox transcript not found."
+    );
+  }
+
+  if (!caseItem) {
+    throw new Error(
+      "Master Case not found."
+    );
+  }
+
+  const zohoTicketId =
+    String(
+      caseItem.zohoTicketId || ""
+    ).trim();
+
+  if (!zohoTicketId) {
+    throw new Error(
+      "Master Case has no Zoho ticket ID."
+    );
+  }
+
+  const body =
+    new URLSearchParams({
+      action:
+        "link",
+
+      record_id:
+        transcript.id,
+
+      linked_master_case:
+        caseItem.id,
+
+      linked_zoho_ticket:
+        zohoTicketId
+    });
+
+  const response =
+    await fetch(
+      buildApiUrl(
+        appConfig.endpoints
+          .veloxManualLink
+      ),
+      {
+        method: "POST",
+
+        headers: {
+          Accept:
+            "application/json"
+        },
+
+        body
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Manual link returned HTTP ${response.status}`
+    );
+  }
+
+  transcript.linkedMasterCase =
+    caseItem.id;
+
+  transcript.linkedZohoTicket =
+    zohoTicketId;
+
+  transcript.linkStatus =
+    "linked";
+
+  transcript.linkMethod =
+    "manual";
+
+  transcript.linkReason =
+    "Manually linked by Ops";
+
+  await refreshVeloxData();
+}
+
+async function submitManualVeloxUnlink(
+  veloxId
+) {
+  const transcript =
+    state.veloxTranscripts.find(
+      (item) =>
+        item.id === veloxId
+    );
+
+  if (!transcript) {
+    throw new Error(
+      "Velox transcript not found."
+    );
+  }
+
+  const body =
+    new URLSearchParams({
+      action:
+        "unlink",
+
+      record_id:
+        transcript.id
+    });
+
+  const response =
+    await fetch(
+      buildApiUrl(
+        appConfig.endpoints
+          .veloxManualLink
+      ),
+      {
+        method: "POST",
+
+        headers: {
+          Accept:
+            "application/json"
+        },
+
+        body
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Manual unlink returned HTTP ${response.status}`
+    );
+  }
+
+  transcript.linkedMasterCase =
+    "";
+
+  transcript.linkedZohoTicket =
+    "";
+
+  transcript.linkStatus =
+    "not_linked";
+
+  transcript.linkMethod =
+    "manual";
+
+  transcript.linkReason =
+    "Manually unlinked by Ops";
+
+  await refreshVeloxData();
+}
+
 function renderVeloxDetail(
   transcript
 ) {
@@ -1910,15 +2119,47 @@ function renderVeloxDetail(
         </div>
       </div>
 
-      <span class="pill ${isLinked
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          "
+        >
+          <span class="pill ${isLinked
       ? "green"
       : "grey"
     }">
-        ${isLinked
+            ${isLinked
       ? "Linked"
       : "Not linked"
     }
-      </span>
+          </span>
+
+          ${isLinked
+      ? `
+              <button
+                class="media-view-button"
+                id="veloxManualUnlinkButton"
+                type="button"
+                data-velox-id="${escapeHtml(
+        transcript.id
+      )}"
+              >
+                Unlink
+              </button>
+            `
+      : ""
+    }
+        </div>
+      </div>
     </div>
 
     <div class="hero-grid">
@@ -2088,22 +2329,98 @@ function renderVeloxDetail(
     ]
   ];
 
+  const caseOptions =
+    state.cases
+      .filter(
+        (caseItem) =>
+          !caseItem.isDummy &&
+          caseItem.zohoTicketId
+      )
+      .map((caseItem) => {
+        const searchText = [
+          caseItem.id,
+          caseItem.patient,
+          caseItem.phone,
+          caseItem.email,
+          caseItem.zohoTicketId,
+          ...(caseItem.tickets ?? [])
+            .map((ticket) => ticket.id)
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return `
+        <option
+          value="${escapeHtml(
+          caseItem.id
+        )}"
+          data-search="${escapeHtml(
+          searchText
+        )}"
+        >
+          ${escapeHtml(caseItem.id)}
+          ·
+          ${escapeHtml(caseItem.patient)}
+          ·
+          ${escapeHtml(
+          caseItem.tickets?.[0]?.id || ""
+        )}
+        </option>
+      `;
+      })
+      .join("");
+
   elements.veloxFileRecord.innerHTML =
     recordRows
       .map(
         ([label, value]) => `
-          <div class="record-row">
-            <span class="record-label">
-              ${escapeHtml(label)}
-            </span>
+        <div class="record-row">
+          <span class="record-label">
+            ${escapeHtml(label)}
+          </span>
 
-            <span class="record-value">
-              ${escapeHtml(value)}
-            </span>
-          </div>
-        `
+          <span class="record-value">
+            ${escapeHtml(value)}
+          </span>
+        </div>
+      `
       )
-      .join("");
+      .join("") +
+    `
+    <div class="velox-manual-link">
+      <div class="velox-manual-link-title">
+        Manual Case Link
+      </div>
+
+     <input
+        id="veloxManualCaseSearch"
+        type="search"
+        placeholder="Search case ID, ticket, name, phone or email..."
+      />
+
+      <select
+        id="veloxManualCaseSelect"
+      >
+        <option value="">
+          Select Master Case...
+        </option>
+
+        ${caseOptions}
+      </select>
+
+      <button
+        class="media-view-button"
+        id="veloxManualLinkButton"
+        type="button"
+        data-velox-id="${escapeHtml(
+      transcript.id
+    )}"
+      >
+        Link to Master Case
+      </button>
+    </div>
+  `;
 }
 
 function openVeloxTranscript(
@@ -2515,9 +2832,44 @@ function renderCaseDetail(caseItem) {
         </div>
         <div class="hero-subtitle">Master Case <strong>${escapeHtml(caseItem.id)}</strong> · ${escapeHtml(caseItem.caseTypeLabel)} · ${escapeHtml(caseItem.location)}</div>
       </div>
-      <span class="pill ${getLinkStatusClass(caseItem.matchState)}">
-        Master Case link: ${escapeHtml(getLinkStatusText(caseItem))}
-      </span>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        "
+      >
+        <span class="pill ${getLinkedVeloxInteractions(caseItem).length
+      ? "green"
+      : getLinkStatusClass(
+        caseItem.matchState
+      )
+    }">
+          Master Case link:
+          ${escapeHtml(
+      getLinkedVeloxInteractions(caseItem).length
+        ? "Linked"
+        : getLinkStatusText(caseItem)
+    )}
+        </span>
+
+        ${getLinkedVeloxInteractions(caseItem).length
+      ? `
+              <button
+                class="media-view-button velox-unlink-case-button"
+                type="button"
+                data-velox-id="${escapeHtml(
+        getLinkedVeloxInteractions(
+          caseItem
+        )[0].veloxId
+      )}"
+              >
+                Unlink Operi Call
+              </button>
+            `
+      : ""
+    }
+      </div>
     </div>
     <div class="hero-grid">
       <div><div class="info-label">Client</div><div class="info-value">${escapeHtml(caseItem.client)}</div></div>
@@ -2603,6 +2955,87 @@ function renderCaseDetail(caseItem) {
       .join("");
 
   renderCaseMedia(caseItem);
+
+  const availableVeloxOptions =
+    state.veloxTranscripts
+      .filter((transcript) => {
+        return (
+          transcript.id &&
+          String(
+            transcript.linkStatus || ""
+          ).toLowerCase() !== "linked"
+        );
+      })
+      .map((transcript) => {
+        const searchText = [
+          transcript.id,
+          transcript.fileName,
+          transcript.participant,
+          transcript.phone,
+          transcript.email,
+          transcript.callDate
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return `
+        <option
+          value="${escapeHtml(
+          transcript.id
+        )}"
+          data-search="${escapeHtml(
+          searchText
+        )}"
+        >
+          ${escapeHtml(
+          transcript.fileName ||
+          transcript.id
+        )}
+          ·
+          ${escapeHtml(
+          transcript.callDate ||
+          "No date"
+        )}
+        </option>
+      `;
+      })
+      .join("");
+
+  elements.caseRecord.innerHTML += `
+  <div class="velox-manual-link">
+    <div class="velox-manual-link-title">
+      Link Operi Call
+    </div>
+
+    <input
+  id="caseManualVeloxSearch"
+      type="search"
+      placeholder="Search filename, date, phone or email..."
+    />
+
+    <select
+      id="caseManualVeloxSelect"
+    >
+      <option value="">
+        Select Velox transcript...
+      </option>
+
+      ${availableVeloxOptions}
+    </select>
+
+    <button
+      class="media-view-button"
+      id="caseManualVeloxLinkButton"
+      type="button"
+      data-case-id="${escapeHtml(
+    caseItem.id
+  )}"
+    >
+      Link Operi Call
+    </button>
+  </div>
+`;
 
   elements.matchingSummary.innerHTML = caseItem.matchingSummary.map((item) => `
     <div class="match-box">
@@ -3194,8 +3627,480 @@ function bindEvents() {
   });
 
   document.addEventListener(
-    "click",
+    "input",
     (event) => {
+
+      /*
+        VELOX -> MASTER CASE SEARCH
+      */
+      if (
+        event.target.id ===
+        "veloxManualCaseSearch"
+      ) {
+        const query =
+          event.target.value
+            .trim()
+            .toLowerCase();
+
+        const select =
+          document.getElementById(
+            "veloxManualCaseSelect"
+          );
+
+        if (!select) {
+          return;
+        }
+
+        const matches =
+          state.cases
+            .filter(
+              (caseItem) =>
+                !caseItem.isDummy &&
+                caseItem.zohoTicketId
+            )
+            .filter((caseItem) => {
+              if (!query) {
+                return true;
+              }
+
+              const searchable = [
+                caseItem.id,
+                caseItem.patient,
+                caseItem.phone,
+                caseItem.email,
+                caseItem.zohoTicketId,
+                ...(caseItem.tickets ?? [])
+                  .map(
+                    (ticket) =>
+                      ticket.id
+                  )
+              ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+              return searchable.includes(
+                query
+              );
+            });
+
+        select.innerHTML = `
+        <option value="">
+          ${matches.length
+            ? `${matches.length} matching case${matches.length === 1 ? "" : "s"}`
+            : "No matching cases"
+          }
+        </option>
+
+        ${matches
+            .map(
+              (caseItem) => `
+              <option
+                value="${escapeHtml(
+                caseItem.id
+              )}"
+              >
+                ${escapeHtml(
+                caseItem.id
+              )}
+                ·
+                ${escapeHtml(
+                caseItem.patient
+              )}
+                ·
+                ${escapeHtml(
+                caseItem
+                  .tickets?.[0]
+                  ?.id || ""
+              )}
+              </option>
+            `
+            )
+            .join("")}
+      `;
+
+        /*
+          Automatically recommend
+          the first matching result.
+        */
+        if (
+          query &&
+          matches.length
+        ) {
+          select.selectedIndex = 1;
+        }
+
+        return;
+      }
+
+
+      /*
+        MASTER CASE -> VELOX SEARCH
+      */
+      if (
+        event.target.id ===
+        "caseManualVeloxSearch"
+      ) {
+        const query =
+          event.target.value
+            .trim()
+            .toLowerCase();
+
+        const select =
+          document.getElementById(
+            "caseManualVeloxSelect"
+          );
+
+        if (!select) {
+          return;
+        }
+
+        const matches =
+          state.veloxTranscripts
+            .filter(
+              (transcript) =>
+                transcript.id &&
+                String(
+                  transcript.linkStatus ||
+                  ""
+                ).toLowerCase() !==
+                "linked"
+            )
+            .filter(
+              (transcript) => {
+                if (!query) {
+                  return true;
+                }
+
+                const searchable = [
+                  transcript.id,
+                  transcript.fileName,
+                  transcript.participant,
+                  transcript.phone,
+                  transcript.email,
+                  transcript.callDate
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+                  .toLowerCase();
+
+                return searchable.includes(
+                  query
+                );
+              }
+            );
+
+        select.innerHTML = `
+        <option value="">
+          ${matches.length
+            ? `${matches.length} matching transcript${matches.length === 1 ? "" : "s"}`
+            : "No matching transcripts"
+          }
+        </option>
+
+        ${matches
+            .map(
+              (transcript) => `
+              <option
+                value="${escapeHtml(
+                transcript.id
+              )}"
+              >
+                ${escapeHtml(
+                transcript.fileName ||
+                transcript.id
+              )}
+                ·
+                ${escapeHtml(
+                transcript.participant ||
+                "No participant"
+              )}
+                ·
+                ${escapeHtml(
+                transcript.callDate ||
+                "No date"
+              )}
+              </option>
+            `
+            )
+            .join("")}
+      `;
+
+        /*
+          Automatically recommend
+          first matching result.
+        */
+        if (
+          query &&
+          matches.length
+        ) {
+          select.selectedIndex = 1;
+        }
+
+        return;
+      }
+    }
+  );
+
+  document.addEventListener(
+    "click",
+    async (event) => {
+
+      const caseVeloxLinkButton =
+        event.target.closest(
+          "#caseManualVeloxLinkButton"
+        );
+
+      if (caseVeloxLinkButton) {
+        const select =
+          document.getElementById(
+            "caseManualVeloxSelect"
+          );
+
+        const veloxId =
+          String(
+            select?.value || ""
+          ).trim();
+
+        const caseId =
+          String(
+            caseVeloxLinkButton
+              .dataset.caseId || ""
+          ).trim();
+
+        if (!veloxId) {
+          showToast(
+            "Select a Velox transcript first."
+          );
+
+          return;
+        }
+
+        caseVeloxLinkButton.disabled =
+          true;
+
+        caseVeloxLinkButton.textContent =
+          "Linking...";
+
+        try {
+          await submitManualVeloxLink(
+            veloxId,
+            caseId
+          );
+
+          showToast(
+            "Operi call linked successfully."
+          );
+
+          const selectedCase =
+            state.cases.find(
+              (item) =>
+                item.id === caseId
+            );
+
+          if (selectedCase) {
+            renderCaseDetail(
+              selectedCase
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Manual Velox link failed:",
+            error
+          );
+
+          showToast(
+            "Unable to link this Operi call."
+          );
+
+          caseVeloxLinkButton.disabled =
+            false;
+
+          caseVeloxLinkButton.textContent =
+            "Link Operi Call";
+        }
+
+        return;
+      }
+
+      const manualLinkButton =
+        event.target.closest(
+          "#veloxManualLinkButton"
+        );
+
+      if (manualLinkButton) {
+        const select =
+          document.getElementById(
+            "veloxManualCaseSelect"
+          );
+
+        const caseId =
+          String(
+            select?.value || ""
+          ).trim();
+
+        if (!caseId) {
+          showToast(
+            "Select a Master Case first."
+          );
+
+          return;
+        }
+
+        manualLinkButton.disabled = true;
+        manualLinkButton.textContent =
+          "Linking...";
+
+        try {
+          const veloxId =
+            manualLinkButton.dataset.veloxId;
+
+          await submitManualVeloxLink(
+            veloxId,
+            caseId
+          );
+
+          showToast(
+            "Transcript linked successfully."
+          );
+
+          const refreshedTranscript =
+            state.veloxTranscripts.find(
+              (item) =>
+                item.id === veloxId
+            );
+
+          if (refreshedTranscript) {
+            renderVeloxDetail(
+              refreshedTranscript
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Manual Velox link failed:",
+            error
+          );
+
+          showToast(
+            "Unable to link this transcript."
+          );
+
+          manualLinkButton.disabled =
+            false;
+
+          manualLinkButton.textContent =
+            "Link to Master Case";
+        }
+
+        return;
+      }
+
+      const veloxUnlinkButton =
+        event.target.closest(
+          "#veloxManualUnlinkButton"
+        );
+
+      if (veloxUnlinkButton) {
+        veloxUnlinkButton.disabled =
+          true;
+
+        veloxUnlinkButton.textContent =
+          "Unlinking...";
+
+        try {
+          await submitManualVeloxUnlink(
+            veloxUnlinkButton.dataset.veloxId
+          );
+
+          showToast(
+            "Transcript unlinked successfully."
+          );
+
+          const refreshedTranscript =
+            state.veloxTranscripts.find(
+              (item) =>
+                item.id ===
+                veloxUnlinkButton.dataset.veloxId
+            );
+
+          if (refreshedTranscript) {
+            renderVeloxDetail(
+              refreshedTranscript
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Manual Velox unlink failed:",
+            error
+          );
+
+          showToast(
+            "Unable to unlink this transcript."
+          );
+
+          veloxUnlinkButton.disabled =
+            false;
+
+          veloxUnlinkButton.textContent =
+            "Unlink from Master Case";
+        }
+
+        return;
+      }
+
+
+      const caseVeloxUnlinkButton =
+        event.target.closest(
+          ".velox-unlink-case-button"
+        );
+
+      if (caseVeloxUnlinkButton) {
+        caseVeloxUnlinkButton.disabled =
+          true;
+
+        caseVeloxUnlinkButton.textContent =
+          "Unlinking...";
+
+        try {
+          await submitManualVeloxUnlink(
+            caseVeloxUnlinkButton.dataset.veloxId
+          );
+
+          showToast(
+            "Operi call unlinked successfully."
+          );
+
+          const selectedCase =
+            state.cases.find(
+              (item) =>
+                item.id ===
+                state.selectedCaseId
+            );
+
+          if (selectedCase) {
+            renderCaseDetail(
+              selectedCase
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Manual Velox unlink failed:",
+            error
+          );
+
+          showToast(
+            "Unable to unlink this Operi call."
+          );
+
+          caseVeloxUnlinkButton.disabled =
+            false;
+
+          caseVeloxUnlinkButton.textContent =
+            "Unlink Operi Call";
+        }
+
+        return;
+      }
 
       const readMoreButton =
         event.target.closest(

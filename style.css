@@ -1312,6 +1312,48 @@ tr[data-velox-id] .secondary-text {
   transform: none;
 }
 
+.velox-manual-link {
+  display: grid;
+  gap: 8px;
+  margin: 10px 14px 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+
+.velox-manual-link input {
+  width: 100%;
+  min-width: 0;
+  height: 35px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 9px;
+}
+
+.velox-manual-link-title {
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.velox-manual-link select {
+  width: 100%;
+  min-width: 0;
+  height: 35px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 9px;
+}
+
+.velox-manual-link button {
+  width: 100%;
+}
+
+
 @media (max-width: 1180px) {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
