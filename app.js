@@ -3269,14 +3269,19 @@ function renderTimeline(caseItem) {
     ]);
 
   const filtered =
-    state.activeTimelineChannel ===
-      "all"
+    state.activeTimelineChannel === "all"
       ? interactions
-      : interactions.filter(
-        (item) =>
-          item.channel ===
-          state.activeTimelineChannel
-      );
+      : state.activeTimelineChannel === "email"
+        ? interactions.filter(
+          (item) =>
+            item.channel === "email" ||
+            item.channel === "comment"
+        )
+        : interactions.filter(
+          (item) =>
+            item.channel ===
+            state.activeTimelineChannel
+        );
 
   elements.timelineCount.textContent = filtered.length;
 
