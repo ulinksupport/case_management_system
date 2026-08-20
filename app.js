@@ -870,6 +870,16 @@ async function fetchVeloxTranscripts() {
           String(
             item.linkStatus ??
             "not_evaluated"
+          ).trim(),
+
+        linkMethod:
+          String(
+            item.linkMethod ?? ""
+          ).trim(),
+
+        linkReason:
+          String(
+            item.linkReason ?? ""
           ).trim()
       }))
       .filter(
@@ -1800,6 +1810,21 @@ async function refreshVeloxData() {
       transcripts;
 
     renderVeloxTable();
+
+    if (state.selectedCaseId) {
+      const selectedCase =
+        state.cases.find(
+          (item) =>
+            item.id ===
+            state.selectedCaseId
+        );
+
+      if (selectedCase) {
+        renderTimeline(
+          selectedCase
+        );
+      }
+    }
   } catch (error) {
     console.error(
       "Velox transcript feed unavailable:",
@@ -2670,11 +2695,155 @@ function formatTimelineContent(value) {
     .trim();
 }
 
+function getLinkedVeloxInteractions(
+  caseItem
+) {
+  const caseMasterId =
+    String(
+      caseItem.id ?? ""
+    ).trim();
+
+  const caseZohoId =
+    String(
+      caseItem.zohoTicketId ?? ""
+    ).trim();
+
+  const caseTicketNumbers =
+    (caseItem.tickets ?? [])
+      .map((ticket) =>
+        String(
+          ticket.id ?? ""
+        )
+          .replace(/^ZD-/i, "")
+          .trim()
+      )
+      .filter(Boolean);
+
+  return state.veloxTranscripts
+    .filter((transcript) => {
+      if (
+        String(
+          transcript.linkStatus ?? ""
+        ).toLowerCase() !== "linked"
+      ) {
+        return false;
+      }
+
+      const linkedMasterCase =
+        String(
+          transcript.linkedMasterCase ?? ""
+        ).trim();
+
+      const linkedZohoTicket =
+        String(
+          transcript.linkedZohoTicket ?? ""
+        ).trim();
+
+      const masterCaseMatches =
+        linkedMasterCase &&
+        caseMasterId &&
+        linkedMasterCase === caseMasterId;
+
+      const internalZohoMatches =
+        linkedZohoTicket &&
+        caseZohoId &&
+        linkedZohoTicket === caseZohoId;
+
+      const ticketNumberMatches =
+        linkedZohoTicket &&
+        caseTicketNumbers.includes(
+          linkedZohoTicket.replace(
+            /^ZD-/i,
+            ""
+          )
+        );
+
+      return (
+        masterCaseMatches ||
+        internalZohoMatches ||
+        ticketNumberMatches
+      );
+    })
+    .map((transcript) => {
+      const callDate =
+        String(
+          transcript.callDate ?? ""
+        ).trim();
+
+      const timestamp =
+        callDate
+          ? `${callDate}T00:00:00+08:00`
+          : transcript.updatedAt ||
+          new Date(0).toISOString();
+
+      return {
+        id: transcript.id,
+
+        channel: "velox",
+
+        party:
+          transcript.participant ||
+          "Caller",
+
+        time:
+          callDate
+            ? formatVeloxCallDate(
+              callDate
+            )
+            : "Not available",
+
+        timestamp,
+
+        source: "Operi / TurboScribe",
+
+        title:
+          transcript.fileName ||
+          "Velox call transcript",
+
+        content:
+          transcript.transcript ||
+          "Transcript content is not available.",
+
+        confidence: null,
+
+        signals:
+          transcript.linkReason ||
+          (
+            transcript.linkMethod ===
+              "manual"
+              ? "Manually linked to this case"
+              : "Automatically linked by exact identifier"
+          ),
+
+        attachments: [],
+
+        veloxId:
+          transcript.id
+      };
+    });
+}
+
 function renderTimeline(caseItem) {
-  const interactions = sortInteractions(caseItem.interactions);
-  const filtered = state.activeTimelineChannel === "all"
-    ? interactions
-    : interactions.filter((item) => item.channel === state.activeTimelineChannel);
+  const veloxInteractions =
+    getLinkedVeloxInteractions(
+      caseItem
+    );
+
+  const interactions =
+    sortInteractions([
+      ...(caseItem.interactions ?? []),
+      ...veloxInteractions
+    ]);
+
+  const filtered =
+    state.activeTimelineChannel ===
+      "all"
+      ? interactions
+      : interactions.filter(
+        (item) =>
+          item.channel ===
+          state.activeTimelineChannel
+      );
 
   elements.timelineCount.textContent = filtered.length;
 
