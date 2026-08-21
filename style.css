@@ -961,6 +961,29 @@ tbody tr:last-child td {
   font-weight: 770;
 }
 
+.thread-ai-summary {
+  margin-top: 9px;
+  padding: 10px 12px;
+  border: 1px solid #d9d5f5;
+  border-left: 3px solid #7467c7;
+  border-radius: 8px;
+  background: #f7f5ff;
+}
+
+.thread-ai-summary-label {
+  margin-bottom: 5px;
+  color: #6256ad;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+}
+
+.thread-ai-summary-text {
+  color: #302b49;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .timeline-preview {
   margin-top: 8px;
   color: #465164;
@@ -1351,6 +1374,37 @@ tr[data-velox-id] .secondary-text {
 
 .velox-manual-link button {
   width: 100%;
+}
+
+.ai-summary-timeline {
+  padding: 18px;
+}
+
+.ai-summary-entry {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d9d5f5;
+  border-left: 3px solid #7467c7;
+  border-radius: 9px;
+  background: #f7f5ff;
+}
+
+.ai-summary-entry:last-child {
+  margin-bottom: 0;
+}
+
+.ai-summary-entry-time {
+  margin-bottom: 6px;
+  color: #6256ad;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.ai-summary-entry-content {
+  color: #302b49;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 

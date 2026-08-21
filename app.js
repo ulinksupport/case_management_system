@@ -1038,6 +1038,11 @@ function mapZohoDetailEventToInteraction(event) {
       String(event.content ?? "").trim() ||
       "No readable content was returned.",
 
+    aiSummary:
+      String(
+        event.aiSummary ?? ""
+      ).trim(),
+
     direction,
 
     eventType: isComment
@@ -1226,6 +1231,8 @@ const elements = {
   backButton: document.getElementById("backButton"),
   caseHero: document.getElementById("caseHero"),
   timelineContainer: document.getElementById("timelineContainer"),
+  aiSummaryTimeline:
+    document.getElementById("aiSummaryTimeline"),
   timelineCount: document.getElementById("timelineCount"),
   ticketTableBody: document.getElementById("ticketTableBody"),
   matchingTableBody: document.getElementById("matchingTableBody"),
@@ -2882,6 +2889,7 @@ function renderCaseDetail(caseItem) {
   `;
 
   renderTimeline(caseItem);
+  renderAiSummaryTimeline(caseItem);
 
   elements.ticketTableBody.innerHTML = caseItem.tickets.map((ticket) => `
     <tr>
@@ -3303,6 +3311,26 @@ function renderTimeline(caseItem) {
   ${escapeHtml(item.title)}
 </div>
 
+${(
+      item.channel === "email" ||
+      item.channel === "comment"
+    ) && item.aiSummary
+      ? `
+    <div class="thread-ai-summary">
+      <div class="thread-ai-summary-label">
+        AI SUMMARY
+      </div>
+
+      <div class="thread-ai-summary-text">
+        ${escapeHtml(
+        item.aiSummary
+      )}
+      </div>
+    </div>
+  `
+      : ""
+    }
+
 <div
   class="timeline-preview ${item.channel === "email"
       ? "timeline-preview-collapsed"
@@ -3393,6 +3421,69 @@ ${item.attachments.length
         button.hidden = true;
       }
     });
+}
+
+function renderAiSummaryTimeline(caseItem) {
+  if (!elements.aiSummaryTimeline) {
+    return;
+  }
+
+  const summaries =
+    (caseItem.interactions || [])
+      .filter((item) =>
+        String(
+          item.aiSummary || ""
+        ).trim()
+      )
+      .sort((a, b) => {
+        return (
+          new Date(b.timestamp || 0).getTime() -
+          new Date(a.timestamp || 0).getTime()
+        );
+      });
+
+  if (!summaries.length) {
+    elements.aiSummaryTimeline.innerHTML = `
+      <div class="empty-state">
+        No AI summaries available.
+      </div>
+    `;
+    return;
+  }
+
+  elements.aiSummaryTimeline.innerHTML =
+    summaries
+      .map((item) => {
+        const time =
+          item.time ||
+          item.timestamp ||
+          "";
+
+        return `
+          <div class="ai-summary-entry">
+
+            <div class="ai-summary-entry-time">
+              ${escapeHtml(
+          item.title || "Email / Comment"
+        )}
+              ${time
+            ? ` · ${escapeHtml(
+              formatTicketDate(time)
+            )}`
+            : ""
+          }
+            </div>
+
+            <div class="ai-summary-entry-content">
+              ${escapeHtml(
+            item.aiSummary
+          )}
+            </div>
+
+          </div>
+        `;
+      })
+      .join("");
 }
 
 function formatChannelName(channel) {

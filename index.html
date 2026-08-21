@@ -337,6 +337,7 @@
             <section class="card detail-main-card">
               <div class="tabs" role="tablist">
                 <button class="tab active" data-tab="timeline" type="button">Unified Timeline</button>
+                <button class="tab" data-tab="ai-summary" type="button">AI Summary</button>
                 <button class="tab" data-tab="tickets" type="button">Linked Tickets</button>
                 <button class="tab" data-tab="matching" type="button">Linking Evidence</button>
               </div>
@@ -352,6 +353,14 @@
                   <span class="result-count"><strong id="timelineCount">0</strong> entries</span>
                 </div>
                 <div class="timeline" id="timelineContainer"></div>
+              </div>
+
+              <div class="tab-panel" id="tab-ai-summary">
+                <div class="ai-summary-timeline" id="aiSummaryTimeline">
+                  <div class="empty-state">
+                    No AI summaries available.
+                  </div>
+                </div>
               </div>
 
               <div class="tab-panel" id="tab-tickets">
