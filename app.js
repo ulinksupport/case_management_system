@@ -1634,9 +1634,24 @@ function renderCaseTable() {
       return `
     <tr data-case-id="${escapeHtml(item.id)}">
       <td>
-        <div class="case-link">${escapeHtml(item.id)} <span class="pill ${item.isDummy ? "amber" : "green"}">${item.isDummy ? "DUMMY" : "LIVE"}</span></div>
-        <div class="primary-text">${escapeHtml(item.patient)}</div>
-        <div class="secondary-text">${escapeHtml(item.location)}</div>
+        <div class="case-link">
+          ${escapeHtml(item.id)}
+          <span class="pill ${item.isDummy ? "amber" : "green"}">
+            ${item.isDummy ? "DUMMY" : "LIVE"}
+          </span>
+        </div>
+
+        <div class="primary-text">
+          ${escapeHtml(item.patient)}
+        </div>
+
+        <div class="secondary-text">
+          Zoho ID: ${escapeHtml(item.zohoTicketId || "—")}
+        </div>
+
+        <div class="secondary-text">
+          ${escapeHtml(item.location)}
+        </div>
       </td>
       <td>
         <div class="primary-text">${escapeHtml(item.caseTypeLabel)}</div>
@@ -2939,6 +2954,7 @@ function renderCaseDetail(caseItem) {
 
   const recordRows = [
     ["Master Case ID", caseItem.id],
+    ["Zoho Ticket ID", caseItem.zohoTicketId],
     ["Case Status", caseItem.status],
     ["Contact ID", caseItem.contactId],
     ["Phone", caseItem.phone],
