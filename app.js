@@ -3521,6 +3521,64 @@ function activateTab(tabName) {
   });
 }
 
+let caseDetailRefreshTimer = null;
+async function refreshOpenCaseFromDatabase() {
+  const caseId = state.selectedCaseId;
+
+  if (!caseId) {
+    return;
+  }
+
+  const currentCase = state.cases.find(
+    item => item.id === caseId
+  );
+
+  if (
+    !currentCase ||
+    currentCase.isDummy ||
+    !currentCase.zohoTicketId
+  ) {
+    return;
+  }
+
+  try {
+    const detail =
+      await fetchZohoTicketDetail(
+        currentCase.zohoTicketId
+      );
+
+    const interactions =
+      sortInteractions(
+        detail.interactions || []
+      );
+
+    currentCase.interactions = interactions;
+    currentCase.totalThreads =
+      detail.totalThreads || 0;
+    currentCase.totalComments =
+      detail.totalComments || 0;
+    currentCase.detailLoaded = true;
+
+    state.detailCache.set(
+      currentCase.zohoTicketId,
+      {
+        interactions,
+        totalThreads:
+          currentCase.totalThreads,
+        totalComments:
+          currentCase.totalComments
+      }
+    );
+
+    renderCaseDetail(currentCase);
+  } catch (error) {
+    console.warn(
+      "Background case refresh failed:",
+      error
+    );
+  }
+}
+
 async function openCase(caseId) {
   const selectedCase = state.cases.find(
     (item) => item.id === caseId
@@ -3536,6 +3594,13 @@ async function openCase(caseId) {
   // Open the detail page immediately.
   renderCaseDetail(selectedCase);
   showView("detail");
+  clearInterval(caseDetailRefreshTimer);
+
+  caseDetailRefreshTimer =
+    setInterval(
+      refreshOpenCaseFromDatabase,
+      5000
+    );
 
   // Dummy records do not have a real Zoho ID.
   if (
@@ -3716,7 +3781,17 @@ function bindEvents() {
     elements.sidebar.classList.toggle("open");
   });
 
-  elements.backButton.addEventListener("click", () => showView("cases"));
+  elements.backButton.addEventListener(
+    "click",
+    () => {
+      clearInterval(caseDetailRefreshTimer);
+      caseDetailRefreshTimer = null;
+
+      state.selectedCaseId = null;
+
+      showView("cases");
+    }
+  );
 
   elements.veloxBackButton
     .addEventListener(
