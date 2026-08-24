@@ -1592,13 +1592,20 @@ function renderCaseTable() {
   const filtered = state.cases.filter((item) => {
     const searchable = [
       item.id,
+      item.zohoTicketId,
       item.patient,
       item.phone,
       item.email,
+      item.client,
       item.location,
       item.caseTypeLabel,
-      item.tickets.map((ticket) => ticket.id).join(" ")
-    ].join(" ").toLowerCase();
+      item.caseDescription,
+      ...(item.tickets ?? []).map((ticket) => ticket.id),
+      ...(item.tickets ?? []).map((ticket) => ticket.subject)
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
 
     return searchable.includes(query)
       && (type === "all" || item.caseType === type)
@@ -3746,11 +3753,18 @@ function handleGlobalSearch() {
   const matchingCase = state.cases.find((item) => {
     const searchable = [
       item.id,
+      item.zohoTicketId,
       item.patient,
       item.phone,
       item.email,
-      ...item.tickets.map((ticket) => ticket.id)
-    ].join(" ").toLowerCase();
+      item.client,
+      item.caseDescription,
+      ...(item.tickets ?? []).map((ticket) => ticket.id),
+      ...(item.tickets ?? []).map((ticket) => ticket.subject)
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return searchable.includes(query);
   });
 
