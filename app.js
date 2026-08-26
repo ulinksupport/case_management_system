@@ -468,7 +468,10 @@ function mapZohoTicketToCase(ticket, index) {
   const status = String(ticket.status ?? "").trim() || "Unknown";
   const channel = normalizeChannel(ticket.channel);
   const createdAt = ticket.createdAt || "";
-  const updatedAt = ticket.updatedAt || createdAt;
+  const updatedAt =
+    ticket.zohoUpdatedAt ||
+    ticket.updatedAt ||
+    createdAt;
   const rawMatchState = String(
     ticket.matchState ?? ""
   )
@@ -687,11 +690,17 @@ function buildLiveSnapshot(payload) {
 
   const sortedTickets = [...root.tickets].sort((a, b) => {
     const aTime = new Date(
-      a.updatedAt || a.createdAt || 0
+      a.zohoUpdatedAt ||
+      a.updatedAt ||
+      a.createdAt ||
+      0
     ).getTime();
 
     const bTime = new Date(
-      b.updatedAt || b.createdAt || 0
+      b.zohoUpdatedAt ||
+      b.updatedAt ||
+      b.createdAt ||
+      0
     ).getTime();
 
     return bTime - aTime;
