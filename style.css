@@ -1407,6 +1407,128 @@ tr[data-velox-id] .secondary-text {
   line-height: 1.55;
 }
 
+.ai-case-report {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ai-case-report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-case-report-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.ai-case-report-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.ai-case-report-section {
+  margin-bottom: 19px;
+}
+
+.ai-case-report-section h3 {
+  margin: 0 0 8px;
+  color: var(--brand-dark);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.ai-case-report-copy {
+  color: #374355;
+  font-size: 10px;
+  line-height: 1.75;
+}
+
+.ai-case-report-copy p {
+  margin: 0;
+}
+
+.ai-case-report-list {
+  margin: 7px 0;
+  padding-left: 19px;
+}
+
+.ai-case-report-list li {
+  margin-bottom: 5px;
+}
+
+.ai-case-report-generated {
+  margin-top: 20px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.ai-case-report-loading {
+  display: flex;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 30px;
+}
+
+.ai-case-report-spinner {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 3px solid #dce9ef;
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: aiCaseReportSpin 0.8s linear infinite;
+}
+
+@keyframes aiCaseReportSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-case-report-loading-title,
+.ai-case-report-placeholder-title {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ai-case-report-loading-copy,
+.ai-case-report-placeholder-copy {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.ai-case-report-placeholder,
+.ai-case-report-error {
+  padding: 35px 22px;
+  text-align: center;
+}
+
+.ai-case-report-error {
+  color: var(--danger);
+}
+
+.ai-case-report-error button {
+  margin-top: 12px;
+}
+
+
+
+
 
 @media (max-width: 1180px) {
   .kpi-grid {

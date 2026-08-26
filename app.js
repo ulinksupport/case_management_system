@@ -21,6 +21,9 @@ const appConfig = {
     zohoTicketDetail:
       "/webhook/zoho-ticket-detail",
 
+    aiCaseReport:
+      "/webhook/ai-case-report",
+
     veloxTranscripts:
       "/webhook/velox-transcripts-feed",
 
@@ -1208,7 +1211,10 @@ const state = {
   refreshInProgress: false,
 
   detailCache: new Map(),
-  detailRequestSequence: 0
+  detailRequestSequence: 0,
+
+  aiCaseReports: new Map(),
+  aiCaseReportRequestSequence: 0
 };
 
 const elements = {
@@ -3460,62 +3466,287 @@ function renderAiSummaryTimeline(caseItem) {
     return;
   }
 
-  const summaries =
-    (caseItem.interactions || [])
-      .filter((item) =>
-        String(
-          item.aiSummary || ""
-        ).trim()
-      )
-      .sort((a, b) => {
-        return (
-          new Date(b.timestamp || 0).getTime() -
-          new Date(a.timestamp || 0).getTime()
-        );
-      });
+  const ticketId =
+    String(
+      caseItem?.zohoTicketId || ""
+    ).trim();
 
-  if (!summaries.length) {
+  if (!ticketId) {
     elements.aiSummaryTimeline.innerHTML = `
       <div class="empty-state">
-        No AI summaries available.
+        AI case report is not available because
+        this case has no Zoho ticket ID.
       </div>
     `;
     return;
   }
 
-  elements.aiSummaryTimeline.innerHTML =
-    summaries
-      .map((item) => {
-        const time =
-          item.time ||
-          item.timestamp ||
-          "";
+  const cached =
+    state.aiCaseReports.get(ticketId);
+
+  /*
+    Nothing generated yet.
+    Do NOT generate automatically when case opens.
+    AI runs only when Ops clicks AI Summary.
+  */
+  if (!cached) {
+    elements.aiSummaryTimeline.innerHTML = `
+      <div class="ai-case-report-placeholder">
+        <div class="ai-case-report-placeholder-title">
+          AI Case Report
+        </div>
+
+        <div class="ai-case-report-placeholder-copy">
+          Open this tab to generate a current executive
+          summary from the latest stored case interactions.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (cached.status === "loading") {
+    elements.aiSummaryTimeline.innerHTML = `
+      <div class="ai-case-report-loading">
+        <div class="ai-case-report-spinner"></div>
+
+        <div>
+          <div class="ai-case-report-loading-title">
+            Generating case report...
+          </div>
+
+          <div class="ai-case-report-loading-copy">
+            Reading the case history in chronological
+            order and preparing the latest report.
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (cached.status === "error") {
+    elements.aiSummaryTimeline.innerHTML = `
+      <div class="ai-case-report-error">
+        <strong>Unable to generate case report.</strong>
+        <div>
+          ${escapeHtml(
+      cached.message ||
+      "Please try again."
+    )}
+        </div>
+
+        <button
+          class="media-view-button ai-case-report-retry"
+          type="button"
+        >
+          Try again
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const report =
+    String(cached.report || "").trim();
+
+  const generatedAt =
+    cached.generatedAt
+      ? formatTicketDate(cached.generatedAt)
+      : "";
+
+  /*
+    Convert report headings/paragraphs into
+    readable HTML while escaping model output.
+  */
+  const sections =
+    report
+      .split(/\n(?=[A-Z][A-Z /&-]{3,}\n)/)
+      .map(section => section.trim())
+      .filter(Boolean);
+
+  const reportHtml =
+    sections
+      .map(section => {
+        const lines =
+          section.split("\n");
+
+        const heading =
+          String(lines.shift() || "").trim();
+
+        const body =
+          lines.join("\n").trim();
+
+        const bodyHtml =
+          escapeHtml(body)
+            .replace(
+              /^-\s+(.+)$/gm,
+              "<li>$1</li>"
+            )
+            .replace(
+              /(<li>.*<\/li>)/gs,
+              "<ul class=\"ai-case-report-list\">$1</ul>"
+            )
+            .replace(/\n\n+/g, "</p><p>")
+            .replace(/\n/g, "<br>");
 
         return `
-          <div class="ai-summary-entry">
+          <section class="ai-case-report-section">
+            <h3>
+              ${escapeHtml(heading)}
+            </h3>
 
-            <div class="ai-summary-entry-time">
-              ${escapeHtml(
-          item.title || "Email / Comment"
-        )}
-              ${time
-            ? ` · ${escapeHtml(
-              formatTicketDate(time)
-            )}`
-            : ""
-          }
+            <div class="ai-case-report-copy">
+              <p>${bodyHtml}</p>
             </div>
-
-            <div class="ai-summary-entry-content">
-              ${escapeHtml(
-            item.aiSummary
-          )}
-            </div>
-
-          </div>
+          </section>
         `;
       })
       .join("");
+
+  elements.aiSummaryTimeline.innerHTML = `
+    <div class="ai-case-report">
+
+      <div class="ai-case-report-header">
+        <div>
+          <div class="ai-case-report-title">
+            Executive Case Report
+          </div>
+
+          <div class="ai-case-report-subtitle">
+            Generated from the current stored
+            case history
+          </div>
+        </div>
+
+        <button
+          class="media-view-button ai-case-report-regenerate"
+          type="button"
+        >
+          Regenerate
+        </button>
+      </div>
+
+      ${reportHtml}
+
+      ${generatedAt
+      ? `
+          <div class="ai-case-report-generated">
+            Generated ${escapeHtml(generatedAt)}
+          </div>
+        `
+      : ""
+    }
+
+    </div>
+  `;
+}
+
+async function generateAiCaseReport(
+  caseItem,
+  force = false
+) {
+  if (
+    !caseItem ||
+    caseItem.isDummy ||
+    !caseItem.zohoTicketId
+  ) {
+    return;
+  }
+
+  const ticketId =
+    String(caseItem.zohoTicketId).trim();
+
+  const existing =
+    state.aiCaseReports.get(ticketId);
+
+  if (
+    existing?.status === "loading"
+  ) {
+    return;
+  }
+
+  /*
+    If already generated and this was not
+    an explicit regenerate request, keep it.
+  */
+  if (
+    !force &&
+    existing?.status === "ready"
+  ) {
+    renderAiSummaryTimeline(caseItem);
+    return;
+  }
+
+  const requestSequence =
+    ++state.aiCaseReportRequestSequence;
+
+  state.aiCaseReports.set(
+    ticketId,
+    {
+      status: "loading"
+    }
+  );
+
+  renderAiSummaryTimeline(caseItem);
+
+  try {
+    const result =
+      await fetchAiCaseReport(ticketId);
+
+    /*
+      Ignore an old response if another report
+      request was started afterwards.
+    */
+    if (
+      requestSequence !==
+      state.aiCaseReportRequestSequence
+    ) {
+      return;
+    }
+
+    state.aiCaseReports.set(
+      ticketId,
+      {
+        status: "ready",
+        report: result.report,
+        generatedAt: result.generatedAt
+      }
+    );
+
+    /*
+      Only render if Ops is still looking
+      at the same case.
+    */
+    if (
+      state.selectedCaseId === caseItem.id
+    ) {
+      renderAiSummaryTimeline(caseItem);
+    }
+  } catch (error) {
+    console.error(
+      "AI case report generation failed:",
+      error
+    );
+
+    state.aiCaseReports.set(
+      ticketId,
+      {
+        status: "error",
+        message:
+          error?.name === "AbortError"
+            ? "The report generation timed out."
+            : error?.message ||
+            "The report could not be generated."
+      }
+    );
+
+    if (
+      state.selectedCaseId === caseItem.id
+    ) {
+      renderAiSummaryTimeline(caseItem);
+    }
+  }
 }
 
 function formatChannelName(channel) {
@@ -3594,6 +3825,84 @@ async function refreshOpenCaseFromDatabase() {
     );
   }
 }
+
+
+async function fetchAiCaseReport(ticketId) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!/^\d{10,30}$/.test(normalizedTicketId)) {
+    throw new Error(
+      "A valid internal Zoho ticket ID is required."
+    );
+  }
+
+  const controller = new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    60000
+  );
+
+  try {
+    const endpoint =
+      `${appConfig.endpoints.aiCaseReport}` +
+      `?ticketId=${encodeURIComponent(
+        normalizedTicketId
+      )}`;
+
+    const response = await fetch(
+      buildApiUrl(endpoint),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `AI case report returned HTTP ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+
+    const root =
+      Array.isArray(payload)
+        ? payload[0]
+        : payload;
+
+    if (
+      !root?.success ||
+      !String(root.report || "").trim()
+    ) {
+      throw new Error(
+        "AI case report response did not contain a report."
+      );
+    }
+
+    return {
+      ticketId:
+        String(
+          root.ticketId ||
+          normalizedTicketId
+        ).trim(),
+
+      generatedAt:
+        String(root.generatedAt || "").trim(),
+
+      report:
+        String(root.report || "").trim()
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 
 async function openCase(caseId) {
   const selectedCase = state.cases.find(
@@ -4392,8 +4701,32 @@ function bindEvents() {
         );
       if (caseTarget) openCase(caseTarget.dataset.caseId);
 
-      const tab = event.target.closest(".tab");
-      if (tab) activateTab(tab.dataset.tab);
+      const tab =
+        event.target.closest(".tab");
+
+      if (tab) {
+        const tabName =
+          tab.dataset.tab;
+
+        activateTab(tabName);
+
+        if (
+          tabName === "ai-summary" &&
+          state.selectedCaseId
+        ) {
+          const selectedCase =
+            state.cases.find(
+              item =>
+                item.id === state.selectedCaseId
+            );
+
+          if (selectedCase) {
+            generateAiCaseReport(
+              selectedCase
+            );
+          }
+        }
+      }
 
       const segment = event.target.closest("#timelineFilters .segment");
       if (segment && state.selectedCaseId) {
@@ -4402,6 +4735,29 @@ function bindEvents() {
         state.activeTimelineChannel = segment.dataset.channel;
         const selectedCase = state.cases.find((item) => item.id === state.selectedCaseId);
         if (selectedCase) renderTimeline(selectedCase);
+      }
+
+      const aiRegenerateButton =
+        event.target.closest(
+          ".ai-case-report-regenerate, .ai-case-report-retry"
+        );
+
+      if (
+        aiRegenerateButton &&
+        state.selectedCaseId
+      ) {
+        const selectedCase =
+          state.cases.find(
+            item =>
+              item.id === state.selectedCaseId
+          );
+
+        if (selectedCase) {
+          generateAiCaseReport(
+            selectedCase,
+            true
+          );
+        }
       }
     });
 
