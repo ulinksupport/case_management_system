@@ -1214,7 +1214,12 @@ const state = {
   detailRequestSequence: 0,
 
   aiCaseReports: new Map(),
-  aiCaseReportRequestSequence: 0
+  aiCaseReportRequestSequence: 0,
+
+  // Keep Ops UI choices during background refresh.
+  preservedVeloxSearch: "",
+  preservedVeloxSelection: "",
+  expandedTimelineIds: new Set()
 };
 
 const elements = {
@@ -2848,6 +2853,54 @@ function renderCaseDetail(caseItem) {
   const isRefreshingSameCase =
     state.selectedCaseId === caseItem.id;
 
+  /*
+    Preserve temporary Ops UI state only when
+    the SAME case is being refreshed.
+
+    If Ops opens another case, start clean.
+  */
+  if (isRefreshingSameCase) {
+    const veloxSearch =
+      document.getElementById(
+        "caseManualVeloxSearch"
+      );
+
+    const veloxSelect =
+      document.getElementById(
+        "caseManualVeloxSelect"
+      );
+
+    if (veloxSearch) {
+      state.preservedVeloxSearch =
+        veloxSearch.value;
+    }
+
+    if (veloxSelect) {
+      state.preservedVeloxSelection =
+        veloxSelect.value;
+    }
+
+    state.expandedTimelineIds =
+      new Set(
+        Array.from(
+          document.querySelectorAll(
+            ".timeline-entry .timeline-preview.expanded"
+          )
+        )
+          .map(preview =>
+            preview
+              .closest(".timeline-entry")
+              ?.dataset.interactionId
+          )
+          .filter(Boolean)
+      );
+  } else {
+    state.preservedVeloxSearch = "";
+    state.preservedVeloxSelection = "";
+    state.expandedTimelineIds =
+      new Set();
+  }
+
   const activeTabBeforeRender =
     isRefreshingSameCase
       ? document.querySelector(".tab.active")
@@ -3082,6 +3135,56 @@ function renderCaseDetail(caseItem) {
     </button>
   </div>
 `;
+
+  const restoredVeloxSearch =
+    document.getElementById(
+      "caseManualVeloxSearch"
+    );
+
+  const restoredVeloxSelect =
+    document.getElementById(
+      "caseManualVeloxSelect"
+    );
+
+  /*
+    Restore search text and rebuild the filtered
+    dropdown exactly as it was before refresh.
+  */
+  if (restoredVeloxSearch) {
+    restoredVeloxSearch.value =
+      state.preservedVeloxSearch || "";
+
+    if (state.preservedVeloxSearch) {
+      restoredVeloxSearch.dispatchEvent(
+        new Event("input", {
+          bubbles: true
+        })
+      );
+    }
+  }
+
+  /*
+    Restore the actual selected transcript AFTER
+    the search has rebuilt the dropdown.
+  */
+  if (
+    restoredVeloxSelect &&
+    state.preservedVeloxSelection
+  ) {
+    const optionStillExists =
+      Array.from(
+        restoredVeloxSelect.options
+      ).some(
+        option =>
+          option.value ===
+          state.preservedVeloxSelection
+      );
+
+    if (optionStillExists) {
+      restoredVeloxSelect.value =
+        state.preservedVeloxSelection;
+    }
+  }
 
   elements.matchingSummary.innerHTML = caseItem.matchingSummary.map((item) => `
     <div class="match-box">
@@ -3337,7 +3440,7 @@ function renderTimeline(caseItem) {
   }
 
   elements.timelineContainer.innerHTML = filtered.map((item) => `
-    <article class="timeline-entry" data-channel="${escapeHtml(item.channel)}">
+    <article class="timeline-entry" data-channel="${escapeHtml(item.channel)}" data-interaction-id="${escapeHtml(item.id)}" >
       <div class="timeline-node ${escapeHtml(item.channel)}">${escapeHtml(getChannelLabel(item.channel))}</div>
       <div class="timeline-card">
         <div class="timeline-meta">
@@ -3348,6 +3451,7 @@ function renderTimeline(caseItem) {
         <div class="timeline-title">
   ${escapeHtml(item.title)}
 </div>
+
 
 ${(
       item.channel === "email" ||
@@ -3430,6 +3534,49 @@ ${item.attachments.length
       </div>
     </article>
   `).join("");
+
+  /*
+  Restore emails Ops had expanded before
+  the 5-second background refresh.
+*/
+  elements.timelineContainer
+    .querySelectorAll(
+      ".timeline-entry"
+    )
+    .forEach(entry => {
+      const interactionId =
+        entry.dataset.interactionId;
+
+      if (
+        !interactionId ||
+        !state.expandedTimelineIds.has(
+          interactionId
+        )
+      ) {
+        return;
+      }
+
+      const preview =
+        entry.querySelector(
+          ".timeline-preview"
+        );
+
+      const button =
+        entry.querySelector(
+          ".timeline-read-more"
+        );
+
+      if (preview) {
+        preview.classList.add(
+          "expanded"
+        );
+      }
+
+      if (button) {
+        button.textContent =
+          "Show less";
+      }
+    });
 
   elements.timelineContainer
     .querySelectorAll(
