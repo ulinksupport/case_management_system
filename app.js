@@ -4653,7 +4653,7 @@ function bindEvents() {
 
       const mediaButton =
         event.target.closest(
-          ".media-view-button"
+          ".media-view-button[data-media-attachment-id]"
         );
 
       if (mediaButton) {
