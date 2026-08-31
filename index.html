@@ -11,7 +11,27 @@
 </head>
 
 <body>
-  <div class="app-shell">
+  <div class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+      <div class="login-brand">Ulink Assist</div>
+
+      <h1>Case Management System</h1>
+
+      <p>
+        Internal access only
+      </p>
+
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required />
+
+      <button type="submit">
+        Sign in
+      </button>
+
+      <div class="login-error" id="loginError" aria-live="polite"></div>
+    </form>
+  </div>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-mark">UA</div>
