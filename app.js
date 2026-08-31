@@ -3743,45 +3743,56 @@ function renderMasterChronology(caseItem) {
             </div>
 
             <div class="timeline-card chronology-card">
-              <div class="timeline-meta">
-                <span class="timeline-channel">
+              <div class="chronology-meta">
+                <div class="chronology-actor">
                   ${escapeHtml(
           item.actor ||
           "Not identified"
         )}
-                </span>
+                </div>
 
-                <span class="timeline-time">
-                  ${escapeHtml(
+                <div class="chronology-meta-detail">
+                  <span>
+                    ${escapeHtml(
           item.timestamp || ""
         )}
-                </span>
+                  </span>
 
-                <span class="timeline-source">
-                  ${escapeHtml(channels)}
-                </span>
+                  ${channels
+            ? `
+                      <span class="chronology-meta-separator">
+                        ·
+                      </span>
+
+                      <span>
+                        ${escapeHtml(channels)}
+                      </span>
+                    `
+            : ""
+          }
+                </div>
               </div>
 
               <div class="timeline-title">
                 ${escapeHtml(
-          item.title || ""
-        )}
+            item.title || ""
+          )}
               </div>
 
               <div class="timeline-preview chronology-copy">
                 ${escapeHtml(
-          item.summary || ""
-        )}
+            item.summary || ""
+          )}
               </div>
 
               <div class="match-line">
                 <span class="match-signals">
                   ${escapeHtml(
-          String(
-            item.status ||
-            "information"
-          ).toUpperCase()
-        )}
+            String(
+              item.status ||
+              "information"
+            ).toUpperCase()
+          )}
                 </span>
               </div>
             </div>
