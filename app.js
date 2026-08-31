@@ -892,7 +892,10 @@ function buildLiveSnapshot(payload) {
 
 async function fetchZohoSnapshot() {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    30000
+  );
 
   try {
     const response = await fetch(
