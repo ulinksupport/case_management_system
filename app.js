@@ -34,6 +34,102 @@ const appConfig = {
   zohoRefreshIntervalMs: 15000
 };
 
+const authElements = {
+  loginScreen:
+    document.getElementById("loginScreen"),
+
+  loginForm:
+    document.getElementById("loginForm"),
+
+  loginPassword:
+    document.getElementById("loginPassword"),
+
+  loginError:
+    document.getElementById("loginError"),
+
+  appShell:
+    document.getElementById("appShell")
+};
+
+async function checkSession() {
+  const response =
+    await fetch("/api/session", {
+      method: "GET",
+      cache: "no-store"
+    });
+
+  const result =
+    await response.json();
+
+  return Boolean(
+    result.authenticated
+  );
+}
+
+function showLogin() {
+  authElements.loginScreen.hidden =
+    false;
+
+  authElements.appShell.hidden =
+    true;
+}
+
+function showApp() {
+  authElements.loginScreen.hidden =
+    true;
+
+  authElements.appShell.hidden =
+    false;
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+
+  authElements.loginError.textContent =
+    "";
+
+  const password =
+    authElements.loginPassword.value;
+
+  const response =
+    await fetch("/api/login", {
+      method: "POST",
+
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+
+      body: JSON.stringify({
+        password
+      })
+    });
+
+  const result =
+    await response.json();
+
+  if (
+    !response.ok ||
+    !result.success
+  ) {
+    authElements.loginError.textContent =
+      result.message ||
+      "Unable to sign in.";
+
+    return;
+  }
+
+  authElements.loginPassword.value =
+    "";
+
+  showApp();
+}
+
+authElements.loginForm.addEventListener(
+  "submit",
+  handleLogin
+);
+
 function buildApiUrl(path) {
   const normalizedPath = `/${String(path ?? "").replace(/^\/+/, "")}`;
   return apiBaseUrl ? `${apiBaseUrl}${normalizedPath}` : normalizedPath;
@@ -5153,5 +5249,23 @@ async function initializeDashboard() {
     showToast("Unable to load the dashboard data.");
   }
 }
+
+async function initializeAuth() {
+  try {
+    const authenticated =
+      await checkSession();
+
+    if (authenticated) {
+      showApp();
+      return;
+    }
+
+    showLogin();
+  } catch {
+    showLogin();
+  }
+}
+
+initializeAuth();
 
 initializeDashboard();
