@@ -3729,12 +3729,16 @@ function renderMasterChronology(caseItem) {
             : "";
 
         return `
-          <article class="timeline-entry">
-            <div class="timeline-node email">
-              AI
+          <article
+            class="timeline-entry chronology-entry chronology-${escapeHtml(
+          item.status || "information"
+        )}"
+          >
+            <div class="timeline-node chronology-node">
+              •
             </div>
 
-            <div class="timeline-card">
+            <div class="timeline-card chronology-card">
               <div class="timeline-meta">
                 <span class="timeline-channel">
                   ${escapeHtml(
@@ -3760,7 +3764,7 @@ function renderMasterChronology(caseItem) {
         )}
               </div>
 
-              <div class="timeline-preview">
+              <div class="timeline-preview chronology-copy">
                 ${escapeHtml(
           item.summary || ""
         )}
@@ -3788,19 +3792,66 @@ function renderMasterChronology(caseItem) {
       : [];
 
   elements.timelineContainer.innerHTML = `
-    <div class="ai-case-report">
+    <div class="master-chronology">
 
-      <section class="ai-case-report-section">
-        <h3>CASE OVERVIEW</h3>
+      <section class="chronology-summary-section">
+        <div class="chronology-section-label">
+          CASE OVERVIEW
+        </div>
 
-        <div class="ai-case-report-copy">
-          <p>
-            ${escapeHtml(
+        <div class="chronology-summary-copy">
+          ${escapeHtml(
     cached.caseOverview || ""
   )}
-          </p>
         </div>
       </section>
+
+      <div class="chronology-status-grid">
+
+        <section class="chronology-status-box current">
+          <div class="chronology-section-label">
+            CURRENT POSITION
+          </div>
+
+          <div class="chronology-summary-copy">
+            ${escapeHtml(
+    cached.currentPosition || ""
+  )}
+          </div>
+        </section>
+
+        <section class="chronology-status-box outstanding">
+          <div class="chronology-section-label">
+            OUTSTANDING
+          </div>
+
+          ${outstanding.length
+      ? `
+                <ul class="chronology-outstanding-list">
+                  ${outstanding
+        .map(
+          item => `
+                        <li>
+                          ${escapeHtml(item)}
+                        </li>
+                      `
+        )
+        .join("")}
+                </ul>
+              `
+      : `
+                <div class="chronology-summary-copy">
+                  No clearly identified outstanding items.
+                </div>
+              `
+    }
+        </section>
+
+      </div>
+
+      <div class="chronology-heading">
+        CASE CHRONOLOGY
+      </div>
 
       ${chronologyHtml || `
         <div class="empty-state">
@@ -3808,42 +3859,6 @@ function renderMasterChronology(caseItem) {
         </div>
       `}
 
-      <section class="ai-case-report-section">
-        <h3>CURRENT POSITION</h3>
-
-        <div class="ai-case-report-copy">
-          <p>
-            ${escapeHtml(
-    cached.currentPosition || ""
-  )}
-          </p>
-        </div>
-      </section>
-
-      <section class="ai-case-report-section">
-        <h3>OUTSTANDING</h3>
-
-        ${outstanding.length
-      ? `
-              <ul class="ai-case-report-list">
-                ${outstanding
-        .map(
-          item => `
-                      <li>
-                        ${escapeHtml(item)}
-                      </li>
-                    `
-        )
-        .join("")}
-              </ul>
-            `
-      : `
-              <div class="ai-case-report-copy">
-                No clearly identified outstanding items.
-              </div>
-            `
-    }
-      </section>
     </div>
   `;
 }

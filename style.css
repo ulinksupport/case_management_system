@@ -1605,6 +1605,113 @@ tr[data-velox-id] .secondary-text {
   margin-top: 12px;
 }
 
+/* AI Master Chronology */
+
+.master-chronology {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chronology-summary-section {
+  padding: 2px 2px 6px;
+}
+
+.chronology-section-label,
+.chronology-heading {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chronology-summary-copy {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.chronology-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.chronology-status-box {
+  padding: 8px 10px;
+  border: 1px solid #dbe5ee;
+  border-radius: 9px;
+}
+
+.chronology-status-box.current {
+  background: #f3f8fc;
+}
+
+.chronology-status-box.outstanding {
+  background: #fff9ee;
+}
+
+.chronology-outstanding-list {
+  margin: 5px 0 0;
+  padding-left: 17px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chronology-heading {
+  margin-top: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e6edf3;
+}
+
+.chronology-card {
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+
+.chronology-entry {
+  margin-bottom: 6px;
+}
+
+.chronology-copy {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chronology-node {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  padding: 0;
+  font-size: 0;
+  border-radius: 50%;
+  margin-top: 12px;
+}
+
+/* subtle status colors */
+
+.chronology-information .chronology-card {
+  background: #f8fbfd;
+}
+
+.chronology-completed .chronology-card {
+  background: #f4fbf7;
+}
+
+.chronology-pending .chronology-card {
+  background: #fffaf2;
+}
+
+.chronology-escalation .chronology-card {
+  background: #fff5f5;
+}
+
+@media (max-width: 800px) {
+  .chronology-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 
 
