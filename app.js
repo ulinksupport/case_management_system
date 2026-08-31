@@ -5861,6 +5861,7 @@ async function initializeAuth() {
       showApp();
       await initializeDashboard();
       return;
+
     }
 
     showLogin();
