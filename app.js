@@ -4524,9 +4524,10 @@ async function refreshOpenCaseFromDatabase() {
     return;
   }
 
-  const currentCase = state.cases.find(
-    item => item.id === caseId
-  );
+  const currentCase =
+    state.cases.find(
+      item => item.id === caseId
+    );
 
   if (
     !currentCase ||
@@ -4547,11 +4548,52 @@ async function refreshOpenCaseFromDatabase() {
         detail.interactions || []
       );
 
-    currentCase.interactions = interactions;
+    const currentSignature =
+      JSON.stringify(
+        (currentCase.interactions || []).map(
+          item => ({
+            id: item.id,
+            timestamp: item.timestamp,
+            content: item.content,
+            title: item.title,
+            status: item.status
+          })
+        )
+      );
+
+    const newSignature =
+      JSON.stringify(
+        interactions.map(
+          item => ({
+            id: item.id,
+            timestamp: item.timestamp,
+            content: item.content,
+            title: item.title,
+            status: item.status
+          })
+        )
+      );
+
+    const detailsChanged =
+      currentSignature !== newSignature ||
+      currentCase.totalThreads !==
+      (detail.totalThreads || 0) ||
+      currentCase.totalComments !==
+      (detail.totalComments || 0);
+
+    if (!detailsChanged) {
+      return;
+    }
+
+    currentCase.interactions =
+      interactions;
+
     currentCase.totalThreads =
       detail.totalThreads || 0;
+
     currentCase.totalComments =
       detail.totalComments || 0;
+
     currentCase.detailLoaded = true;
 
     state.detailCache.set(
@@ -4565,7 +4607,18 @@ async function refreshOpenCaseFromDatabase() {
       }
     );
 
+    const scrollPosition =
+      window.scrollY;
+
     renderCaseDetail(currentCase);
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: "auto"
+      });
+    });
+
   } catch (error) {
     console.warn(
       "Background case refresh failed:",
