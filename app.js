@@ -136,6 +136,7 @@ async function handleLogin(event) {
   }
 
   showApp();
+  await initializeDashboard();
 }
 
 authElements.loginForm.addEventListener(
@@ -5296,4 +5297,19 @@ async function initializeAuth() {
 
 initializeAuth();
 
-initializeDashboard();
+async function initializeAuth() {
+  try {
+    const authenticated =
+      await checkSession();
+
+    if (authenticated) {
+      showApp();
+      await initializeDashboard();
+      return;
+    }
+
+    showLogin();
+  } catch {
+    showLogin();
+  }
+}
