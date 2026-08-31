@@ -48,7 +48,10 @@ const authElements = {
     document.getElementById("loginError"),
 
   appShell:
-    document.getElementById("appShell")
+    document.getElementById("appShell"),
+
+  signoutButton:
+    document.getElementById("signoutButton")
 };
 
 async function checkSession() {
@@ -128,6 +131,21 @@ async function handleLogin(event) {
 authElements.loginForm.addEventListener(
   "submit",
   handleLogin
+);
+
+async function handleSignout() {
+  await fetch("/api/logout", {
+    method: "POST"
+  });
+
+  showLogin();
+
+  authElements.loginPassword.focus();
+}
+
+authElements.signoutButton.addEventListener(
+  "click",
+  handleSignout
 );
 
 function buildApiUrl(path) {

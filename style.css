@@ -102,6 +102,22 @@ body {
   font-size: 10px;
 }
 
+.signout-button {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.signout-button:hover {
+  color: var(--danger);
+  border-color: #e7c2c7;
+}
+
 button,
 input,
 select {
