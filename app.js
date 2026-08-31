@@ -122,8 +122,18 @@ async function handleLogin(event) {
     return;
   }
 
-  authElements.loginPassword.value =
-    "";
+  authElements.loginPassword.value = "";
+
+  const authenticated =
+    await checkSession();
+
+  if (!authenticated) {
+    authElements.loginError.textContent =
+      "Login succeeded but the session could not be created.";
+
+    showLogin();
+    return;
+  }
 
   showApp();
 }

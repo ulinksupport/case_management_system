@@ -1716,3 +1716,9 @@ tr[data-velox-id] .secondary-text {
     padding: 15px;
   }
 }
+
+
+
+[hidden] {
+  display: none !important;
+}
