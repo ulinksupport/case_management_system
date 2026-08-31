@@ -4672,7 +4672,7 @@ async function openCase(caseId) {
   caseDetailRefreshTimer =
     setInterval(
       refreshOpenCaseFromDatabase,
-      5000
+      15000
     );
 
   // Dummy records do not have a real Zoho ID.
