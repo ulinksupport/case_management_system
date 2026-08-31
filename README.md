@@ -31,3 +31,29 @@ No Vite, npm package or build command is required.
 ## Next integration step
 
 Replace the mock `dataRepository` methods in `app.js` with Supabase queries. n8n can populate interaction and AI suggestion tables. The frontend should continue to use only read permissions.
+
+## Authentication
+
+The CMS is protected by a simple internal password login.
+
+Authentication is handled by Vercel serverless API routes:
+
+- `/api/login`
+- `/api/session`
+- `/api/logout`
+
+The production secrets are stored in Vercel Environment Variables:
+
+- `CMS_LOGIN_PASSWORD`
+- `CMS_SESSION_SECRET`
+
+Do not store these values in `app.js`, `index.html`, GitHub, or other frontend files.
+
+The login creates a secure HttpOnly session cookie. The dashboard only initializes after the session has been verified.
+
+To change the login password:
+
+1. Open the Vercel project.
+2. Go to Settings → Environment Variables.
+3. Update `CMS_LOGIN_PASSWORD`.
+4. Redeploy the Production deployment.

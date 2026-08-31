@@ -24,6 +24,9 @@ const appConfig = {
     aiCaseReport:
       "/webhook/ai-case-report",
 
+    aiMasterChronology:
+      "/webhook/ai-master-chronology",
+
     veloxTranscripts:
       "/webhook/velox-transcripts-feed",
 
@@ -761,6 +764,7 @@ function mapZohoTicketToCase(ticket, index) {
     latestInteractionNote: subject,
     updatedAt: formatTicketDate(updatedAt),
     updatedTime: formatTicketTime(updatedAt),
+    sourceUpdatedAt: updatedAt,
     channels: [channel],
     isDummy: false,
     dataSource: "live",
@@ -1300,6 +1304,78 @@ async function fetchZohoTicketDetail(
   }
 }
 
+async function fetchAiMasterChronology(
+  ticketId
+) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!/^\d{10,30}$/.test(
+    normalizedTicketId
+  )) {
+    throw new Error(
+      "A valid internal Zoho ticket ID is required."
+    );
+  }
+
+  const controller =
+    new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    60000
+  );
+
+  try {
+    const endpoint =
+      `${appConfig.endpoints.aiMasterChronology}` +
+      `?ticketId=${encodeURIComponent(
+        normalizedTicketId
+      )}`;
+
+    const response = await fetch(
+      buildApiUrl(endpoint),
+      {
+        method: "GET",
+
+        headers: {
+          Accept: "application/json"
+        },
+
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Master chronology returned HTTP ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    const root =
+      Array.isArray(payload)
+        ? payload[0]
+        : payload;
+
+    if (
+      !root?.success ||
+      !Array.isArray(root.chronology)
+    ) {
+      throw new Error(
+        "Master chronology response was invalid."
+      );
+    }
+
+    return root;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const dataRepository = {
   async getDashboardSnapshot() {
     try {
@@ -1340,6 +1416,9 @@ const state = {
 
   aiCaseReports: new Map(),
   aiCaseReportRequestSequence: 0,
+
+  aiMasterChronologies: new Map(),
+  aiMasterChronologyRequestSequence: 0,
 
   // Keep Ops UI choices during background refresh.
   preservedVeloxSearch: "",
@@ -3530,6 +3609,245 @@ function getLinkedVeloxInteractions(
     });
 }
 
+function renderMasterChronology(caseItem) {
+  const ticketId =
+    String(
+      caseItem?.zohoTicketId || ""
+    ).trim();
+
+  if (!ticketId) {
+    elements.timelineCount.textContent = "0";
+
+    elements.timelineContainer.innerHTML = `
+      <div class="empty-state">
+        Master Chronology is not available because
+        this case has no Zoho ticket ID.
+      </div>
+    `;
+
+    return;
+  }
+
+  const cached =
+    state.aiMasterChronologies.get(
+      ticketId
+    );
+
+  if (!cached) {
+    elements.timelineCount.textContent = "—";
+
+    elements.timelineContainer.innerHTML = `
+      <div class="ai-case-report-loading">
+        <div class="ai-case-report-spinner"></div>
+
+        <div>
+          <div class="ai-case-report-loading-title">
+            Building Master Chronology...
+          </div>
+
+          <div class="ai-case-report-loading-copy">
+            AI is reading the complete case history
+            and arranging the important developments
+            in chronological order.
+          </div>
+        </div>
+      </div>
+    `;
+
+    generateAiMasterChronology(
+      caseItem
+    );
+
+    return;
+  }
+
+  if (cached.status === "loading") {
+    elements.timelineCount.textContent = "—";
+
+    elements.timelineContainer.innerHTML = `
+      <div class="ai-case-report-loading">
+        <div class="ai-case-report-spinner"></div>
+
+        <div>
+          <div class="ai-case-report-loading-title">
+            Building Master Chronology...
+          </div>
+
+          <div class="ai-case-report-loading-copy">
+            Reading emails, comments and linked
+            Operi calls together.
+          </div>
+        </div>
+      </div>
+    `;
+
+    return;
+  }
+
+  if (cached.status === "error") {
+    elements.timelineCount.textContent = "0";
+
+    elements.timelineContainer.innerHTML = `
+      <div class="ai-case-report-error">
+        <strong>
+          Unable to generate Master Chronology.
+        </strong>
+
+        <div>
+          ${escapeHtml(
+      cached.message ||
+      "Please try again."
+    )}
+        </div>
+
+        <button
+          class="media-view-button master-chronology-retry"
+          type="button"
+        >
+          Try again
+        </button>
+      </div>
+    `;
+
+    return;
+  }
+
+  const chronology =
+    Array.isArray(cached.chronology)
+      ? cached.chronology
+      : [];
+
+  elements.timelineCount.textContent =
+    chronology.length;
+
+  const chronologyHtml =
+    chronology
+      .map((item) => {
+        const channels =
+          Array.isArray(item.channels)
+            ? item.channels.join(" · ")
+            : "";
+
+        return `
+          <article class="timeline-entry">
+            <div class="timeline-node email">
+              AI
+            </div>
+
+            <div class="timeline-card">
+              <div class="timeline-meta">
+                <span class="timeline-channel">
+                  ${escapeHtml(
+          item.actor ||
+          "Not identified"
+        )}
+                </span>
+
+                <span class="timeline-time">
+                  ${escapeHtml(
+          item.timestamp || ""
+        )}
+                </span>
+
+                <span class="timeline-source">
+                  ${escapeHtml(channels)}
+                </span>
+              </div>
+
+              <div class="timeline-title">
+                ${escapeHtml(
+          item.title || ""
+        )}
+              </div>
+
+              <div class="timeline-preview">
+                ${escapeHtml(
+          item.summary || ""
+        )}
+              </div>
+
+              <div class="match-line">
+                <span class="match-signals">
+                  ${escapeHtml(
+          String(
+            item.status ||
+            "information"
+          ).toUpperCase()
+        )}
+                </span>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+  const outstanding =
+    Array.isArray(cached.outstanding)
+      ? cached.outstanding
+      : [];
+
+  elements.timelineContainer.innerHTML = `
+    <div class="ai-case-report">
+
+      <section class="ai-case-report-section">
+        <h3>CASE OVERVIEW</h3>
+
+        <div class="ai-case-report-copy">
+          <p>
+            ${escapeHtml(
+    cached.caseOverview || ""
+  )}
+          </p>
+        </div>
+      </section>
+
+      ${chronologyHtml || `
+        <div class="empty-state">
+          No chronology events were generated.
+        </div>
+      `}
+
+      <section class="ai-case-report-section">
+        <h3>CURRENT POSITION</h3>
+
+        <div class="ai-case-report-copy">
+          <p>
+            ${escapeHtml(
+    cached.currentPosition || ""
+  )}
+          </p>
+        </div>
+      </section>
+
+      <section class="ai-case-report-section">
+        <h3>OUTSTANDING</h3>
+
+        ${outstanding.length
+      ? `
+              <ul class="ai-case-report-list">
+                ${outstanding
+        .map(
+          item => `
+                      <li>
+                        ${escapeHtml(item)}
+                      </li>
+                    `
+        )
+        .join("")}
+              </ul>
+            `
+      : `
+              <div class="ai-case-report-copy">
+                No clearly identified outstanding items.
+              </div>
+            `
+    }
+      </section>
+    </div>
+  `;
+}
+
 function renderTimeline(caseItem) {
   const veloxInteractions =
     getLinkedVeloxInteractions(
@@ -3542,20 +3860,23 @@ function renderTimeline(caseItem) {
       ...veloxInteractions
     ]);
 
+  if (state.activeTimelineChannel === "all") {
+    renderMasterChronology(caseItem);
+    return;
+  }
+
   const filtered =
-    state.activeTimelineChannel === "all"
-      ? interactions
-      : state.activeTimelineChannel === "email"
-        ? interactions.filter(
-          (item) =>
-            item.channel === "email" ||
-            item.channel === "comment"
-        )
-        : interactions.filter(
-          (item) =>
-            item.channel ===
-            state.activeTimelineChannel
-        );
+    state.activeTimelineChannel === "email"
+      ? interactions.filter(
+        (item) =>
+          item.channel === "email" ||
+          item.channel === "comment"
+      )
+      : interactions.filter(
+        (item) =>
+          item.channel ===
+          state.activeTimelineChannel
+      );
 
   elements.timelineCount.textContent = filtered.length;
 
@@ -4017,6 +4338,127 @@ async function generateAiCaseReport(
       state.selectedCaseId === caseItem.id
     ) {
       renderAiSummaryTimeline(caseItem);
+    }
+  }
+}
+
+async function generateAiMasterChronology(
+  caseItem,
+  force = false
+) {
+  if (
+    !caseItem ||
+    caseItem.isDummy ||
+    !caseItem.zohoTicketId
+  ) {
+    return;
+  }
+
+  const ticketId =
+    String(caseItem.zohoTicketId).trim();
+
+  const existing =
+    state.aiMasterChronologies.get(
+      ticketId
+    );
+
+  if (existing?.status === "loading") {
+    return;
+  }
+
+  if (
+    !force &&
+    existing?.status === "ready" &&
+    existing.sourceUpdatedAt ===
+    caseItem.sourceUpdatedAt
+  ) {
+    renderTimeline(caseItem);
+    return;
+  }
+
+  const requestSequence =
+    ++state.aiMasterChronologyRequestSequence;
+
+  state.aiMasterChronologies.set(
+    ticketId,
+    {
+      status: "loading"
+    }
+  );
+
+  renderTimeline(caseItem);
+
+  try {
+    const result =
+      await fetchAiMasterChronology(
+        ticketId
+      );
+
+    if (
+      requestSequence !==
+      state.aiMasterChronologyRequestSequence
+    ) {
+      return;
+    }
+
+    state.aiMasterChronologies.set(
+      ticketId,
+      {
+        status: "ready",
+
+        sourceUpdatedAt:
+          caseItem.sourceUpdatedAt,
+
+        generatedAt:
+          result.generatedAt || "",
+        caseOverview:
+          result.caseOverview || "",
+        chronology:
+          Array.isArray(
+            result.chronology
+          )
+            ? result.chronology
+            : [],
+        currentPosition:
+          result.currentPosition || "",
+        outstanding:
+          Array.isArray(
+            result.outstanding
+          )
+            ? result.outstanding
+            : []
+      }
+    );
+
+    if (
+      state.selectedCaseId ===
+      caseItem.id
+    ) {
+      renderTimeline(caseItem);
+    }
+  } catch (error) {
+    console.error(
+      "AI master chronology generation failed:",
+      error
+    );
+
+    state.aiMasterChronologies.set(
+      ticketId,
+      {
+        status: "error",
+        message:
+          error?.name === "AbortError"
+            ? "The chronology generation timed out."
+            : error?.message ||
+            "The chronology could not be generated."
+      }
+    );
+
+    if (
+      state.selectedCaseId ===
+      caseItem.id
+    ) {
+      renderTimeline(caseItem);
     }
   }
 }
@@ -5030,6 +5472,32 @@ function bindEvents() {
             true
           );
         }
+      }
+
+      const chronologyRetryButton =
+        event.target.closest(
+          ".master-chronology-retry"
+        );
+
+      if (
+        chronologyRetryButton &&
+        state.selectedCaseId
+      ) {
+        const selectedCase =
+          state.cases.find(
+            item =>
+              item.id ===
+              state.selectedCaseId
+          );
+
+        if (selectedCase) {
+          generateAiMasterChronology(
+            selectedCase,
+            true
+          );
+        }
+
+        return;
       }
     });
 
