@@ -1605,6 +1605,7 @@ tr[data-velox-id] .secondary-text {
   margin-top: 12px;
 }
 
+
 /* AI Master Chronology */
 
 .master-chronology {
@@ -1665,8 +1666,13 @@ tr[data-velox-id] .secondary-text {
 }
 
 .chronology-card {
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 6px 9px;
+}
+
+.chronology-copy {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .chronology-entry {
@@ -1711,6 +1717,26 @@ tr[data-velox-id] .secondary-text {
   .chronology-status-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Master Chronology timeline starts below summary */
+
+#timelineContainer.master-chronology-mode::before {
+  display: none;
+}
+
+.chronology-events {
+  position: relative;
+}
+
+.chronology-events::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #dbe5ee;
 }
 
 

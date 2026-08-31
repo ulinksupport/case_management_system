@@ -3610,6 +3610,10 @@ function getLinkedVeloxInteractions(
 }
 
 function renderMasterChronology(caseItem) {
+  elements.timelineContainer.classList.add(
+    "master-chronology-mode"
+  );
+
   const ticketId =
     String(
       caseItem?.zohoTicketId || ""
@@ -3853,13 +3857,13 @@ function renderMasterChronology(caseItem) {
         CASE CHRONOLOGY
       </div>
 
-      ${chronologyHtml || `
-        <div class="empty-state">
-          No chronology events were generated.
-        </div>
-      `}
-
-    </div>
+      <div class="chronology-events">
+        ${chronologyHtml || `
+          <div class="empty-state">
+            No chronology events were generated.
+          </div>
+        `}
+      </div>
   `;
 }
 
@@ -3879,6 +3883,10 @@ function renderTimeline(caseItem) {
     renderMasterChronology(caseItem);
     return;
   }
+
+  elements.timelineContainer.classList.remove(
+    "master-chronology-mode"
+  );
 
   const filtered =
     state.activeTimelineChannel === "email"
