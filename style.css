@@ -1765,6 +1765,34 @@ tr[data-velox-id] .secondary-text {
 }
 
 
+.relationship-tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 12px;
+}
+
+.relationship-tab {
+  border: 1px solid #d7dce5;
+  background: #ffffff;
+  color: #475569;
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.relationship-tab:hover {
+  background: #f1f5f9;
+}
+
+.relationship-tab.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
 
 
 @media (max-width: 1180px) {

@@ -741,6 +741,11 @@ function mapZohoTicketToCase(ticket, index) {
 
   return {
     id: masterCaseId,
+    associatedType:
+      String(ticket.associatedType ?? "").trim(),
+
+    ulinkSgCaseId:
+      String(ticket.ulinkSgCaseId ?? "").trim(),
 
     // Long internal Zoho ID used by the detail API.
     zohoTicketId: ticketId,
@@ -1403,6 +1408,8 @@ const state = {
   veloxTranscripts: [],
   selectedVeloxId: null,
 
+  relationshipFilter: "all",
+
   selectedCaseId: null,
   activeTimelineChannel: "all",
   dataMode: "dummy",
@@ -1833,9 +1840,17 @@ function renderCaseTable() {
       .join(" ")
       .toLowerCase();
 
+    const relationship =
+      state.relationshipFilter;
+
+
     return searchable.includes(query)
       && (type === "all" || item.caseType === type)
-      && (match === "all" || item.matchState === match);
+      && (match === "all" || item.matchState === match)
+      && (
+        relationship === "all" ||
+        item.associatedType === relationship
+      );
   });
 
   elements.caseCount.textContent = filtered.length;
@@ -5619,6 +5634,32 @@ function bindEvents() {
     }
   });
 }
+
+document
+  .querySelectorAll(".relationship-tab")
+  .forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        document
+          .querySelectorAll(".relationship-tab")
+          .forEach(btn =>
+            btn.classList.remove("active")
+          );
+
+        button.classList.add("active");
+
+        state.relationshipFilter =
+          button.dataset.type;
+
+        renderCaseTable();
+      }
+    );
+
+  });
+
 
 function renderDashboard() {
   elements.navCaseCount.textContent = state.cases.length;
