@@ -1802,6 +1802,8 @@ function renderCaseTable() {
   const query = elements.caseSearch.value.trim().toLowerCase();
   const type = elements.caseTypeFilter.value;
   const match = elements.matchFilter.value;
+  const relationship =
+    state.relationshipFilter || "all";
 
   const linkedMasterCaseIds =
     new Set(
@@ -1891,6 +1893,15 @@ function renderCaseTable() {
 
         <div class="primary-text">
           ${escapeHtml(item.patient)}
+
+          ${item.associatedType
+          ? `
+                <span class="pill blue case-relationship-badge">
+                  ${escapeHtml(item.associatedType)}
+                </span>
+              `
+          : ""
+        }
         </div>
 
         <div class="secondary-text">
@@ -1901,6 +1912,7 @@ function renderCaseTable() {
           ${escapeHtml(item.location)}
         </div>
       </td>
+      
       <td>
         <div class="primary-text">${escapeHtml(item.caseTypeLabel)}</div>
         <div class="secondary-text">${escapeHtml(item.caseDescription)}</div>
