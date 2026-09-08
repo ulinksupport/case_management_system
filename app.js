@@ -3,7 +3,6 @@
 /*
   Ulink Assist Case Management System
   ----------------------------
-  Change the API base URL in index.html when the n8n domain changes.
   Endpoint-specific values remain as short paths in this file.
 */
 
