@@ -3170,7 +3170,17 @@ function renderCaseDetail(caseItem) {
             ${escapeHtml(getLinkStatusLabel(caseItem.matchState))}
           </span>
         </div>
-        <div class="hero-subtitle">Master Case <strong>${escapeHtml(caseItem.id)}</strong> · ${escapeHtml(caseItem.caseTypeLabel)} · ${escapeHtml(caseItem.location)}</div>
+        <div class="hero-subtitle">
+          Master Case <strong>${escapeHtml(caseItem.id)}</strong>
+          · ${escapeHtml(caseItem.caseTypeLabel)}
+          · ${escapeHtml(caseItem.location)}
+          ${caseItem.associatedType
+      ? ` · <strong>${escapeHtml(caseItem.associatedType)}</strong>`
+      : ""}
+          ${caseItem.ulinkSgCaseId
+      ? ` · Case ID <strong>${escapeHtml(caseItem.ulinkSgCaseId)}</strong>`
+      : ""}
+        </div>
       </div>
       <div
         style="
@@ -3261,7 +3271,7 @@ function renderCaseDetail(caseItem) {
               class="media-view-button linked-ticket-open-button"
               data-linked-ticket-id="${escapeHtml(ticket.ticketId)}"
             >
-              Open Case ↗
+              Open ${escapeHtml(ticket.associatedType || "Linked")} Case ↗
             </button>
           </td>
         </tr>
