@@ -594,6 +594,25 @@ function mapZohoTicketToCase(ticket, index) {
     String(ticket.patientName ?? "").trim() ||
     "Patient not identified";
   const patientPhone = String(ticket.patientPhone ?? "").trim();
+  const hospitalName =
+    String(ticket.hospitalName ?? "").trim();
+
+  const dateOfBirth =
+    String(ticket.dateOfBirth ?? "").trim();
+
+  const doctorName =
+    String(ticket.doctorName ?? "").trim();
+
+  const diagnosis =
+    String(ticket.diagnosis ?? "").trim();
+
+  const admissionTreatmentDate =
+    String(
+      ticket.admissionTreatmentDate ?? ""
+    ).trim();
+
+  const nationality =
+    String(ticket.nationality ?? "").trim();
   const requestorEmail = String(ticket.requestorEmail ?? "").trim();
   const status = String(ticket.status ?? "").trim() || "Unknown";
   const channel = normalizeChannel(ticket.channel);
@@ -754,6 +773,12 @@ function mapZohoTicketToCase(ticket, index) {
     patient: patientName,
     phone: patientPhone,
     email: requestorEmail,
+    hospitalName,
+    dateOfBirth,
+    doctorName,
+    diagnosis,
+    admissionTreatmentDate,
+    nationality,
     location: "Not available",
     caseType: "zoho",
     caseTypeLabel: "Zoho ticket",
@@ -3322,10 +3347,22 @@ function renderCaseDetail(caseItem) {
   const recordRows = [
     ["Master Case ID", caseItem.id],
     ["Zoho Ticket ID", caseItem.zohoTicketId],
+    ["Ulink SG Case ID", caseItem.ulinkSgCaseId],
+    ["Association", caseItem.associatedType],
     ["Case Status", caseItem.status],
-    ["Contact ID", caseItem.contactId],
+
+    ["Patient Name", caseItem.patient],
+    ["Date of Birth", caseItem.dateOfBirth],
+    ["Nationality", caseItem.nationality],
     ["Phone", caseItem.phone],
     ["Email", caseItem.email],
+
+    ["Hospital", caseItem.hospitalName],
+    ["Doctor", caseItem.doctorName],
+    ["Diagnosis", caseItem.diagnosis],
+    ["Admission / Treatment", caseItem.admissionTreatmentDate],
+
+    ["Contact ID", caseItem.contactId],
     ["Interactions", caseItem.interactions.length],
     ["Linked Tickets", caseItem.tickets.length]
   ];
@@ -3339,7 +3376,13 @@ function renderCaseDetail(caseItem) {
         </span>
 
         <span class="record-value">
-          ${escapeHtml(value)}
+          ${escapeHtml(
+        value === null ||
+          value === undefined ||
+          String(value).trim() === ""
+          ? "Not available"
+          : value
+      )}
         </span>
       </div>
     `)
@@ -4805,6 +4848,22 @@ async function openCase(caseId) {
     return;
   }
 
+  const ticketId = String(
+    selectedCase.zohoTicketId || ""
+  ).trim();
+
+  if (ticketId) {
+    const url =
+      `${window.location.pathname}` +
+      `?openTicket=${encodeURIComponent(ticketId)}`;
+
+    window.history.replaceState(
+      {},
+      document.title,
+      url
+    );
+  }
+
   // Open the detail page immediately.
   renderCaseDetail(selectedCase);
   showView("detail");
@@ -4823,10 +4882,6 @@ async function openCase(caseId) {
   ) {
     return;
   }
-
-  const ticketId = String(
-    selectedCase.zohoTicketId
-  ).trim();
 
   // Reuse previously retrieved history.
   const cachedDetail =
@@ -5028,6 +5083,12 @@ function bindEvents() {
       caseDetailRefreshTimer = null;
 
       state.selectedCaseId = null;
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
 
       showView("cases");
     }
@@ -5960,6 +6021,7 @@ async function initializeDashboard() {
             String(item.zohoTicketId || "").trim() ===
             openTicketId
         );
+
 
       if (matchingCase) {
         await openCase(matchingCase.id);
