@@ -173,327 +173,327 @@
               </div>
 
             </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Master Case</th>
-              <th>Case Type</th>
-              <th>Linked Tickets</th>
-              <th>Channels</th>
-              <th>Latest Interaction</th>
-              <th>Link Status</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody id="caseTableBody"></tbody>
-        </table>
-      </div>
-      </section>
-      </section>
 
-      <section class="view" id="view-unmatched">
-        <div class="page-heading">
-          <div>
-            <p class="eyebrow">MATCHING REVIEW</p>
-            <h1>Unmatched Interactions</h1>
-            <p class="page-description">Messages that could not be confidently linked to an existing Master Case.</p>
-          </div>
-          <div class="last-updated"><strong id="unmatchedSummary">0 items</strong><br />Read-only visibility</div>
-        </div>
-
-        <div class="notice warning-notice">
-          <span class="notice-icon">!</span>
-          <div>This view has no merge, confirm, create-case or edit controls. Resolution will be handled in a separate
-            backend or admin process.</div>
-        </div>
-
-        <section class="card">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Interaction</th>
-                  <th>Source</th>
-                  <th>Content Preview</th>
-                  <th>Possible Case</th>
-                  <th>Confidence</th>
-                  <th>Signals / Conflict</th>
-                  <th>Received</th>
-                </tr>
-              </thead>
-              <tbody id="unmatchedTableBody"></tbody>
-            </table>
-          </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Master Case</th>
+                    <th>Case Type</th>
+                    <th>Linked Tickets</th>
+                    <th>Channels</th>
+                    <th>Latest Interaction</th>
+                    <th>Link Status</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="caseTableBody"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
-      </section>
 
-      <section class="view" id="view-velox">
-        <div class="page-heading">
-          <div>
-            <p class="eyebrow">CALL TRANSCRIPTS</p>
-            <h1>Velox Transcripts</h1>
-            <p class="page-description">
-              Read-only call transcripts retrieved from the Operi drive.
-              Transcript files may be linked to Master Cases later.
-            </p>
-          </div>
-
-          <div class="last-updated">
-            <strong id="veloxSummary">0 transcripts</strong>
-            <br />
-            Read-only visibility
-          </div>
-        </div>
-
-        <div class="notice">
-          <span class="notice-icon">i</span>
-          <div>
-            Transcript filenames and extracted information are displayed as received.
-            No AI suggestions or external actions are available in this section.
-          </div>
-        </div>
-
-        <section class="card">
-          <div class="card-header">
+        <section class="view" id="view-unmatched">
+          <div class="page-heading">
             <div>
-              <h2>Transcript Files</h2>
-              <p>Select one transcript to read its full content</p>
+              <p class="eyebrow">MATCHING REVIEW</p>
+              <h1>Unmatched Interactions</h1>
+              <p class="page-description">Messages that could not be confidently linked to an existing Master Case.</p>
+            </div>
+            <div class="last-updated"><strong id="unmatchedSummary">0 items</strong><br />Read-only visibility</div>
+          </div>
+
+          <div class="notice warning-notice">
+            <span class="notice-icon">!</span>
+            <div>This view has no merge, confirm, create-case or edit controls. Resolution will be handled in a separate
+              backend or admin process.</div>
+          </div>
+
+          <section class="card">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Interaction</th>
+                    <th>Source</th>
+                    <th>Content Preview</th>
+                    <th>Possible Case</th>
+                    <th>Confidence</th>
+                    <th>Signals / Conflict</th>
+                    <th>Received</th>
+                  </tr>
+                </thead>
+                <tbody id="unmatchedTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-velox">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">CALL TRANSCRIPTS</p>
+              <h1>Velox Transcripts</h1>
+              <p class="page-description">
+                Read-only call transcripts retrieved from the Operi drive.
+                Transcript files may be linked to Master Cases later.
+              </p>
+            </div>
+
+            <div class="last-updated">
+              <strong id="veloxSummary">0 transcripts</strong>
+              <br />
+              Read-only visibility
             </div>
           </div>
 
-          <div class="toolbar">
-            <input id="veloxSearch" type="search" placeholder="Search filename, participant, phone or email..." />
-
-            <span class="result-count">
-              <strong id="veloxCount">0</strong> transcripts shown
-            </span>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Original File</th>
-                  <th>Participant</th>
-                  <th>Phone / Email</th>
-                  <th>Call Date</th>
-                  <th>Linked Record</th>
-                  <th>Updated</th>
-                </tr>
-              </thead>
-
-              <tbody id="veloxTableBody"></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
-
-      <section class="view" id="view-ingestion">
-        <div class="page-heading">
-          <div>
-            <p class="eyebrow">INTEGRATION MONITORING</p>
-            <h1>Ingestion Status</h1>
-            <p class="page-description">Basic visibility for n8n workflows feeding the Storyboard.</p>
-          </div>
-          <div class="last-updated">Last checked<br /><strong id="ingestionUpdatedText">—</strong></div>
-        </div>
-
-        <div class="kpi-grid" id="ingestionKpis"></div>
-
-        <section class="card">
-          <div class="card-header">
+          <div class="notice">
+            <span class="notice-icon">i</span>
             <div>
-              <h2>Connected Sources</h2>
-              <p>Email and WhatsApp are the initial connected channels</p>
+              Transcript filenames and extracted information are displayed as received.
+              No AI suggestions or external actions are available in this section.
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Status</th>
-                  <th>Last Event</th>
-                  <th>Delay</th>
-                  <th>Latest Reference</th>
-                  <th>Integration Method</th>
-                </tr>
-              </thead>
-              <tbody id="ingestionTableBody"></tbody>
-            </table>
-          </div>
-        </section>
-      </section>
 
-      <section class="view" id="view-velox-detail">
-        <button class="back-button" id="veloxBackButton" type="button">
-          ← Back to Velox Transcripts
-        </button>
-
-        <section class="card case-hero" id="veloxHero"></section>
-
-        <div class="detail-grid">
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Call Transcript</h2>
-                <p>Full text extracted from the Operi transcript file</p>
+                <h2>Transcript Files</h2>
+                <p>Select one transcript to read its full content</p>
               </div>
+            </div>
 
-              <span class="readonly-mini">
-                Read-only
+            <div class="toolbar">
+              <input id="veloxSearch" type="search" placeholder="Search filename, participant, phone or email..." />
+
+              <span class="result-count">
+                <strong id="veloxCount">0</strong> transcripts shown
               </span>
             </div>
 
-            <div class="velox-transcript" id="veloxTranscriptContent">
-              <div class="empty-state">
-                Select a transcript to view its content.
-              </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Original File</th>
+                    <th>Participant</th>
+                    <th>Phone / Email</th>
+                    <th>Call Date</th>
+                    <th>Linked Record</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+
+                <tbody id="veloxTableBody"></tbody>
+              </table>
             </div>
           </section>
+        </section>
 
-          <aside class="side-stack">
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Transcript Record</h2>
-                  <p>Source file and available identifiers</p>
-                </div>
-              </div>
-
-              <div class="record-list" id="veloxFileRecord"></div>
-            </section>
-          </aside>
-        </div>
-      </section>
-
-      <section class="view" id="view-detail">
-        <button class="back-button" id="backButton" type="button">← Back to Master Cases</button>
-
-        <section class="card case-hero" id="caseHero"></section>
-
-        <div class="detail-grid">
-          <section class="card detail-main-card">
-            <div class="tabs" role="tablist">
-              <button class="tab active" data-tab="timeline" type="button">Unified Timeline</button>
-              <button class="tab" data-tab="ai-summary" type="button">AI Summary</button>
-              <button class="tab" data-tab="tickets" type="button">Linked Tickets</button>
-              <button class="tab" data-tab="matching" type="button">Linking Evidence</button>
+        <section class="view" id="view-ingestion">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">INTEGRATION MONITORING</p>
+              <h1>Ingestion Status</h1>
+              <p class="page-description">Basic visibility for n8n workflows feeding the Storyboard.</p>
             </div>
+            <div class="last-updated">Last checked<br /><strong id="ingestionUpdatedText">—</strong></div>
+          </div>
 
-            <div class="tab-panel active" id="tab-timeline">
-              <div class="timeline-toolbar">
-                <div class="segment-control" id="timelineFilters">
-                  <button class="segment active" data-channel="all" type="button">All</button>
-                  <button class="segment" data-channel="email" type="button">Email</button>
-                  <button class="segment" data-channel="whatsapp" type="button">WhatsApp</button>
-                  <button class="segment" data-channel="velox" type="button">Operi Calls</button>
-                </div>
-                <span class="result-count"><strong id="timelineCount">0</strong> entries</span>
-              </div>
-              <div class="timeline" id="timelineContainer"></div>
-            </div>
+          <div class="kpi-grid" id="ingestionKpis"></div>
 
-            <div class="tab-panel" id="tab-ai-summary">
-              <div class="ai-summary-timeline" id="aiSummaryTimeline">
-                <div class="empty-state">
-                  No AI summaries available.
-                </div>
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Connected Sources</h2>
+                <p>Email and WhatsApp are the initial connected channels</p>
               </div>
             </div>
-
-            <div class="tab-panel" id="tab-tickets">
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Ticket</th>
-                      <th>Party</th>
-                      <th>Subject</th>
-                      <th>Status</th>
-                      <th>Created</th>
-                    </tr>
-                  </thead>
-                  <tbody id="ticketTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="tab-panel" id="tab-matching">
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Interaction</th>
-                      <th>Confidence</th>
-                      <th>Strong Identifiers</th>
-                      <th>Supporting Context</th>
-                      <th>Decision</th>
-                    </tr>
-                  </thead>
-                  <tbody id="matchingTableBody"></tbody>
-                </table>
-              </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Last Event</th>
+                    <th>Delay</th>
+                    <th>Latest Reference</th>
+                    <th>Integration Method</th>
+                  </tr>
+                </thead>
+                <tbody id="ingestionTableBody"></tbody>
+              </table>
             </div>
           </section>
+        </section>
 
-          <aside class="side-stack">
+        <section class="view" id="view-velox-detail">
+          <button class="back-button" id="veloxBackButton" type="button">
+            ← Back to Velox Transcripts
+          </button>
+
+          <section class="card case-hero" id="veloxHero"></section>
+
+          <div class="detail-grid">
             <section class="card">
               <div class="card-header">
                 <div>
-                  <h2>AI Case Guidance</h2>
-                  <p>Generated by n8n when connected</p>
-                </div>
-                <span class="readonly-mini">Read-only</span>
-              </div>
-              <div class="ai-panel" id="aiPanel"></div>
-            </section>
-
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Case Record</h2>
-                  <p>Core identifiers and linked data</p>
-                </div>
-              </div>
-              <div class="record-list" id="caseRecord"></div>
-            </section>
-
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Documents & Media</h2>
-                  <p>Files attached across this Master Case</p>
+                  <h2>Call Transcript</h2>
+                  <p>Full text extracted from the Operi transcript file</p>
                 </div>
 
-                <span class="readonly-mini" id="caseMediaCount">
-                  0 files
+                <span class="readonly-mini">
+                  Read-only
                 </span>
               </div>
 
-              <div class="media-list" id="caseMediaList">
+              <div class="velox-transcript" id="veloxTranscriptContent">
                 <div class="empty-state">
-                  No documents or media found.
+                  Select a transcript to view its content.
                 </div>
               </div>
             </section>
 
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Linking Summary</h2>
-                  <p>Backend-generated evidence</p>
+            <aside class="side-stack">
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Transcript Record</h2>
+                    <p>Source file and available identifiers</p>
+                  </div>
+                </div>
+
+                <div class="record-list" id="veloxFileRecord"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-detail">
+          <button class="back-button" id="backButton" type="button">← Back to Master Cases</button>
+
+          <section class="card case-hero" id="caseHero"></section>
+
+          <div class="detail-grid">
+            <section class="card detail-main-card">
+              <div class="tabs" role="tablist">
+                <button class="tab active" data-tab="timeline" type="button">Unified Timeline</button>
+                <button class="tab" data-tab="ai-summary" type="button">AI Summary</button>
+                <button class="tab" data-tab="tickets" type="button">Linked Tickets</button>
+                <button class="tab" data-tab="matching" type="button">Linking Evidence</button>
+              </div>
+
+              <div class="tab-panel active" id="tab-timeline">
+                <div class="timeline-toolbar">
+                  <div class="segment-control" id="timelineFilters">
+                    <button class="segment active" data-channel="all" type="button">All</button>
+                    <button class="segment" data-channel="email" type="button">Email</button>
+                    <button class="segment" data-channel="whatsapp" type="button">WhatsApp</button>
+                    <button class="segment" data-channel="velox" type="button">Operi Calls</button>
+                  </div>
+                  <span class="result-count"><strong id="timelineCount">0</strong> entries</span>
+                </div>
+                <div class="timeline" id="timelineContainer"></div>
+              </div>
+
+              <div class="tab-panel" id="tab-ai-summary">
+                <div class="ai-summary-timeline" id="aiSummaryTimeline">
+                  <div class="empty-state">
+                    No AI summaries available.
+                  </div>
                 </div>
               </div>
-              <div class="matching-summary" id="matchingSummary"></div>
+
+              <div class="tab-panel" id="tab-tickets">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ticket</th>
+                        <th>Relationship</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ticketTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="tab-panel" id="tab-matching">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Interaction</th>
+                        <th>Confidence</th>
+                        <th>Strong Identifiers</th>
+                        <th>Supporting Context</th>
+                        <th>Decision</th>
+                      </tr>
+                    </thead>
+                    <tbody id="matchingTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
             </section>
-          </aside>
-        </div>
-      </section>
-  </div>
-  </main>
+
+            <aside class="side-stack">
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>AI Case Guidance</h2>
+                    <p>Generated by n8n when connected</p>
+                  </div>
+                  <span class="readonly-mini">Read-only</span>
+                </div>
+                <div class="ai-panel" id="aiPanel"></div>
+              </section>
+
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Case Record</h2>
+                    <p>Core identifiers and linked data</p>
+                  </div>
+                </div>
+                <div class="record-list" id="caseRecord"></div>
+              </section>
+
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Documents & Media</h2>
+                    <p>Files attached across this Master Case</p>
+                  </div>
+
+                  <span class="readonly-mini" id="caseMediaCount">
+                    0 files
+                  </span>
+                </div>
+
+                <div class="media-list" id="caseMediaList">
+                  <div class="empty-state">
+                    No documents or media found.
+                  </div>
+                </div>
+              </section>
+
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Linking Summary</h2>
+                    <p>Backend-generated evidence</p>
+                  </div>
+                </div>
+                <div class="matching-summary" id="matchingSummary"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

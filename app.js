@@ -772,6 +772,16 @@ function mapZohoTicketToCase(ticket, index) {
     channels: [channel],
     isDummy: false,
     dataSource: "live",
+    relatedTickets: Array.isArray(ticket.relatedTickets)
+      ? ticket.relatedTickets.map((item) => ({
+        ticketId: String(item.ticketId ?? "").trim(),
+        ticketNumber: String(item.ticketNumber ?? "").trim(),
+        subject: String(item.subject ?? "").trim(),
+        status: String(item.status ?? "").trim(),
+        associatedType: String(item.associatedType ?? "").trim(),
+        ulinkSgCaseId: String(item.ulinkSgCaseId ?? "").trim()
+      }))
+      : [],
     tickets: [
       {
         id: displayTicketId,
@@ -3214,18 +3224,57 @@ function renderCaseDetail(caseItem) {
   renderTimeline(caseItem);
   renderAiSummaryTimeline(caseItem);
 
-  elements.ticketTableBody.innerHTML = caseItem.tickets.map((ticket) => `
-    <tr>
-      <td>${ticket.webUrl
-      ? `<a class="case-link" href="${escapeHtml(ticket.webUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ticket.id)}</a>`
-      : `<span class="case-link">${escapeHtml(ticket.id)}</span>`
-    }</td>
-      <td>${escapeHtml(ticket.party)}</td>
-      <td>${escapeHtml(ticket.subject)}</td>
-      <td><span class="pill blue">${escapeHtml(ticket.status)}</span></td>
-      <td>${escapeHtml(ticket.createdAt)}</td>
-    </tr>
-  `).join("");
+  const relatedTickets =
+    Array.isArray(caseItem.relatedTickets)
+      ? caseItem.relatedTickets
+      : [];
+
+  elements.ticketTableBody.innerHTML =
+    relatedTickets.length
+      ? relatedTickets.map((ticket) => `
+        <tr>
+          <td>
+            <span class="case-link">
+              ZD-${escapeHtml(ticket.ticketNumber)}
+            </span>
+          </td>
+
+          <td>
+            <span class="pill blue">
+              ${escapeHtml(ticket.associatedType || "Linked")}
+            </span>
+          </td>
+
+          <td>
+            ${escapeHtml(ticket.subject || "—")}
+          </td>
+
+          <td>
+            <span class="pill blue">
+              ${escapeHtml(ticket.status || "Unknown")}
+            </span>
+          </td>
+
+          <td>
+            <button
+              type="button"
+              class="media-view-button linked-ticket-open-button"
+              data-linked-ticket-id="${escapeHtml(ticket.ticketId)}"
+            >
+              Open Case ↗
+            </button>
+          </td>
+        </tr>
+      `).join("")
+      : `
+        <tr>
+          <td colspan="5">
+            <div class="empty-state">
+              No linked Parent/Child tickets found.
+            </div>
+          </td>
+        </tr>
+      `;
 
   elements.matchingTableBody.innerHTML = sortInteractions(caseItem.interactions).map((item) => `
     <tr>
@@ -4894,6 +4943,25 @@ async function openCase(caseId) {
   }
 }
 
+function openLinkedTicketInNewTab(ticketId) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!normalizedTicketId) {
+    return;
+  }
+
+  const url =
+    `${window.location.origin}${window.location.pathname}` +
+    `?openTicket=${encodeURIComponent(normalizedTicketId)}`;
+
+  window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
 function handleGlobalSearch() {
   const query = elements.globalSearch.value.trim().toLowerCase();
   if (!query) return;
@@ -5525,6 +5593,19 @@ function bindEvents() {
         return;
       }
 
+      const linkedTicketTarget =
+        event.target.closest(
+          ".linked-ticket-open-button"
+        );
+
+      if (linkedTicketTarget) {
+        openLinkedTicketInNewTab(
+          linkedTicketTarget.dataset.linkedTicketId
+        );
+
+        return;
+      }
+
       const caseTarget =
         event.target.closest(
           "[data-case-id]"
@@ -5852,6 +5933,28 @@ async function initializeDashboard() {
 
     await refreshDashboardData();
     await refreshVeloxData();
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const openTicketId =
+      String(
+        params.get("openTicket") || ""
+      ).trim();
+
+    if (openTicketId) {
+      const matchingCase =
+        state.cases.find(
+          (item) =>
+            String(item.zohoTicketId || "").trim() ===
+            openTicketId
+        );
+
+      if (matchingCase) {
+        await openCase(matchingCase.id);
+      }
+    }
 
     window.setInterval(() => {
       if (document.hidden) {
