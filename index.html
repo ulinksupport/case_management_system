@@ -61,7 +61,7 @@
 
       <div class="sidebar-note">
         <strong>Read-only</strong>
-        Email and WhatsApp are grouped into one Master Case. AI content is for reference only.
+        Email, WhatsApp, Velox are grouped into one Case. AI content is for reference only.
       </div>
     </aside>
 
@@ -88,7 +88,7 @@
           <div class="page-heading">
             <div>
               <p class="eyebrow">CASE OVERVIEW</p>
-              <h1>Master Cases</h1>
+              <h1>Zoho Cases</h1>
               <p class="page-description">Open one case to view all linked emails, WhatsApp messages, tickets and AI
                 guidance in a single timeline.</p>
             </div>
@@ -113,32 +113,10 @@
 
           <div class="kpi-grid" id="kpiGrid"></div>
 
-          <div class="overview-grid">
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Recently Updated</h2>
-                  <p>Latest matched activity across connected channels</p>
-                </div>
-              </div>
-              <div class="recent-list" id="recentCases"></div>
-            </section>
-
-            <section class="card">
-              <div class="card-header">
-                <div>
-                  <h2>Source Health</h2>
-                  <p>Current connection status</p>
-                </div>
-              </div>
-              <div class="source-health" id="sourceHealth"></div>
-            </section>
-          </div>
-
           <section class="card cases-card">
             <div class="card-header">
               <div>
-                <h2>All Master Cases</h2>
+                <h2>All Zoho Cases</h2>
                 <p>Select a row to open the unified case view</p>
               </div>
             </div>
@@ -178,13 +156,13 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Master Case</th>
+                    <th>Zoho Cases</th>
                     <th>Case Type</th>
                     <th>Linked Tickets</th>
                     <th>Channels</th>
                     <th>Latest Interaction</th>
-                    <th>Link Status</th>
-                    <th>Updated</th>
+                    <th>Linked Velox</th>
+                    <th>Updated At</th>
                   </tr>
                 </thead>
                 <tbody id="caseTableBody"></tbody>
@@ -198,7 +176,7 @@
             <div>
               <p class="eyebrow">MATCHING REVIEW</p>
               <h1>Unmatched Interactions</h1>
-              <p class="page-description">Messages that could not be confidently linked to an existing Master Case.</p>
+              <p class="page-description">Messages that could not be confidently linked to an existing Zoho Case.</p>
             </div>
             <div class="last-updated"><strong id="unmatchedSummary">0 items</strong><br />Read-only visibility</div>
           </div>
@@ -236,7 +214,7 @@
               <h1>Velox Transcripts</h1>
               <p class="page-description">
                 Read-only call transcripts retrieved from the Operi drive.
-                Transcript files may be linked to Master Cases later.
+                Transcript files may be linked to Zoho Cases later.
               </p>
             </div>
 
@@ -370,7 +348,7 @@
         </section>
 
         <section class="view" id="view-detail">
-          <button class="back-button" id="backButton" type="button">← Back to Master Cases</button>
+          <button class="back-button" id="backButton" type="button">← Back to All Cases</button>
 
           <section class="card case-hero" id="caseHero"></section>
 
@@ -465,7 +443,7 @@
                 <div class="card-header">
                   <div>
                     <h2>Documents & Media</h2>
-                    <p>Files attached across this Master Case</p>
+                    <p>Files attached across this Zoho Case</p>
                   </div>
 
                   <span class="readonly-mini" id="caseMediaCount">

@@ -1486,8 +1486,6 @@ const elements = {
   ingestionUpdatedText: document.getElementById("ingestionUpdatedText"),
   kpiGrid: document.getElementById("kpiGrid"),
   ingestionKpis: document.getElementById("ingestionKpis"),
-  recentCases: document.getElementById("recentCases"),
-  sourceHealth: document.getElementById("sourceHealth"),
   caseSearch: document.getElementById("caseSearch"),
   caseTypeFilter: document.getElementById("caseTypeFilter"),
   matchFilter: document.getElementById("matchFilter"),
@@ -1788,40 +1786,6 @@ function renderKpis() {
   `).join("");
 }
 
-function renderRecentCases() {
-  const recent = state.cases.slice(0, 3);
-  elements.recentCases.innerHTML = recent.map((item) => `
-    <div class="recent-item" data-case-id="${escapeHtml(item.id)}" tabindex="0" role="button">
-      <span class="recent-strip ${item.matchState === "flagged" ? "flagged" : ""}"></span>
-      <div>
-        <div class="recent-title">${escapeHtml(item.id)} · ${escapeHtml(item.patient)} <span class="pill ${item.isDummy ? "amber" : "green"}">${item.isDummy ? "DUMMY" : "LIVE"}</span></div>
-        <div class="recent-subtitle">${escapeHtml(item.latestInteractionNote)}</div>
-      </div>
-      <div class="recent-side">
-        <div class="recent-score">
-  ${escapeHtml(getLinkStatusText(item))}
-</div>
-<div class="recent-score-label">link status</div>
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderSourceHealth() {
-  elements.sourceHealth.innerHTML = state.ingestion.map((source) => {
-    let dotClass = "";
-    if (source.statusClass === "amber") dotClass = "warning";
-    if (source.statusClass === "grey") dotClass = "planned";
-
-    return `
-      <div class="source-row">
-        <span class="source-dot ${dotClass}"></span>
-        <span class="source-name">${escapeHtml(source.source)}</span>
-        <span class="source-status">${escapeHtml(source.status)}</span>
-      </div>
-    `;
-  }).join("");
-}
 
 function getChannelLabel(channel) {
   const labels = {
@@ -1907,14 +1871,12 @@ function renderCaseTable() {
       const displayLinkText =
         hasOperiLink
           ? "Linked"
-          : getLinkStatusText(item);
+          : "Not Linked";
 
       const displayLinkClass =
         hasOperiLink
           ? "green"
-          : getLinkStatusClass(
-            item.matchState
-          );
+          : "grey";
 
       return `
     <tr data-case-id="${escapeHtml(item.id)}">
@@ -1953,8 +1915,12 @@ function renderCaseTable() {
         <div class="secondary-text">${escapeHtml(item.caseDescription)}</div>
       </td>
       <td>
-        <div class="primary-text">${item.tickets.length} tickets</div>
-        <div class="secondary-text">${escapeHtml(item.tickets.map((ticket) => ticket.id).join(" · "))}</div>
+        <div class="primary-text">
+          ${Array.isArray(item.relatedTickets)
+          ? item.relatedTickets.length
+          : 0
+        } tickets
+        </div>
       </td>
       <td>
         <div class="channel-stack">
@@ -2244,7 +2210,7 @@ async function submitManualVeloxLink(
 
   if (!caseItem) {
     throw new Error(
-      "Master Case not found."
+      "Zoho Case not found."
     );
   }
 
@@ -2255,7 +2221,7 @@ async function submitManualVeloxLink(
 
   if (!zohoTicketId) {
     throw new Error(
-      "Master Case has no Zoho ticket ID."
+      "Zoho Case has no ticket ID."
     );
   }
 
@@ -2538,7 +2504,7 @@ function renderVeloxDetail(
 
       <div>
         <div class="info-label">
-          Linked Master Case
+          Linked Zoho Case
         </div>
 
         <div class="info-value">
@@ -2633,7 +2599,7 @@ function renderVeloxDetail(
       )
     ],
     [
-      "Master Case",
+      "Zoho Case",
       getVeloxValue(
         transcript.linkedMasterCase
       )
@@ -2720,7 +2686,7 @@ function renderVeloxDetail(
         id="veloxManualCaseSelect"
       >
         <option value="">
-          Select Master Case...
+          Select Case...
         </option>
 
         ${caseOptions}
@@ -2734,7 +2700,7 @@ function renderVeloxDetail(
       transcript.id
     )}"
       >
-        Link to Master Case
+        Link to Zoho Case
       </button>
     </div>
   `;
@@ -3026,7 +2992,7 @@ function renderCaseMedia(caseItem) {
     elements.caseMediaList.innerHTML = `
       <div class="empty-state">
         No documents or media were found
-        in this Master Case.
+        in this Case.
       </div>
     `;
 
@@ -3191,12 +3157,9 @@ function renderCaseDetail(caseItem) {
           <h1>${escapeHtml(caseItem.patient)}</h1>
           <span class="pill ${caseItem.isDummy ? "amber" : "green"}">${caseItem.isDummy ? "DUMMY DATA" : "LIVE DATA"}</span>
           <span class="pill blue">${escapeHtml(caseItem.status)}</span>
-          <span class="pill ${getLinkStatusClass(caseItem.matchState)}">
-            ${escapeHtml(getLinkStatusLabel(caseItem.matchState))}
-          </span>
         </div>
         <div class="hero-subtitle">
-          Master Case <strong>${escapeHtml(caseItem.id)}</strong>
+          Zoho Case <strong>${escapeHtml(caseItem.id)}</strong>
           · ${escapeHtml(caseItem.caseTypeLabel)}
           · ${escapeHtml(caseItem.location)}
           ${caseItem.associatedType
@@ -3216,15 +3179,13 @@ function renderCaseDetail(caseItem) {
       >
         <span class="pill ${getLinkedVeloxInteractions(caseItem).length
       ? "green"
-      : getLinkStatusClass(
-        caseItem.matchState
-      )
+      : "grey"
     }">
-          Master Case link:
+          Velox Case link:
           ${escapeHtml(
       getLinkedVeloxInteractions(caseItem).length
         ? "Linked"
-        : getLinkStatusText(caseItem)
+        : "Not Linked"
     )}
         </span>
 
@@ -3239,7 +3200,7 @@ function renderCaseDetail(caseItem) {
         )[0].veloxId
       )}"
               >
-                Unlink Operi Call
+                Unlink Velox Call
               </button>
             `
       : ""
@@ -3252,7 +3213,6 @@ function renderCaseDetail(caseItem) {
       <div><div class="info-label">Patient Email</div><div class="info-value">${escapeHtml(caseItem.email)}</div></div>
       <div><div class="info-label">Hospital</div><div class="info-value">${escapeHtml(caseItem.hospital)}</div></div>
       <div><div class="info-label">Admission / Visit</div><div class="info-value">${escapeHtml(caseItem.admissionDate)}</div></div>
-      <div><div class="info-label">Linked Tickets</div><div class="info-value">${escapeHtml(caseItem.tickets.map((ticket) => ticket.id).join(" · "))}</div></div>
     </div>
   `;
 
@@ -3439,7 +3399,7 @@ function renderCaseDetail(caseItem) {
   elements.caseRecord.innerHTML += `
   <div class="velox-manual-link">
     <div class="velox-manual-link-title">
-      Link Operi Call
+      Link Velox Call
     </div>
 
     <input
@@ -3466,7 +3426,7 @@ function renderCaseDetail(caseItem) {
     caseItem.id
   )}"
     >
-      Link Operi Call
+      Link Velox Call
     </button>
   </div>
 `;
@@ -3755,7 +3715,7 @@ function renderMasterChronology(caseItem) {
 
     elements.timelineContainer.innerHTML = `
       <div class="empty-state">
-        Master Chronology is not available because
+        Chronology is not available because
         this case has no Zoho ticket ID.
       </div>
     `;
@@ -3777,7 +3737,7 @@ function renderMasterChronology(caseItem) {
 
         <div>
           <div class="ai-case-report-loading-title">
-            Building Master Chronology...
+            Building Chronology...
           </div>
 
           <div class="ai-case-report-loading-copy">
@@ -3805,7 +3765,7 @@ function renderMasterChronology(caseItem) {
 
         <div>
           <div class="ai-case-report-loading-title">
-            Building Master Chronology...
+            Building Chronology...
           </div>
 
           <div class="ai-case-report-loading-copy">
@@ -3825,7 +3785,7 @@ function renderMasterChronology(caseItem) {
     elements.timelineContainer.innerHTML = `
       <div class="ai-case-report-error">
         <strong>
-          Unable to generate Master Chronology.
+          Unable to generate Chronology.
         </strong>
 
         <div>
@@ -4603,7 +4563,7 @@ async function generateAiMasterChronology(
     }
   } catch (error) {
     console.error(
-      "AI master chronology generation failed:",
+      "AI chronology generation failed:",
       error
     );
 
@@ -5055,7 +5015,7 @@ function handleGlobalSearch() {
     return;
   }
 
-  showToast("No Master Case matched that search.");
+  showToast("No Zoho Cases matched that search.");
 }
 
 function bindEvents() {
@@ -5119,7 +5079,7 @@ function bindEvents() {
     (event) => {
 
       /*
-        VELOX -> MASTER CASE SEARCH
+        VELOX -> ZOHO CASE SEARCH
       */
       if (
         event.target.id ===
@@ -5223,7 +5183,7 @@ function bindEvents() {
 
 
       /*
-        MASTER CASE -> VELOX SEARCH
+        ZOHO CASE -> VELOX SEARCH
       */
       if (
         event.target.id ===
@@ -5405,7 +5365,7 @@ function bindEvents() {
             false;
 
           caseVeloxLinkButton.textContent =
-            "Link Operi Call";
+            "Link Velox Call";
         }
 
         return;
@@ -5429,7 +5389,7 @@ function bindEvents() {
 
         if (!caseId) {
           showToast(
-            "Select a Master Case first."
+            "Select a Zoho Case first."
           );
 
           return;
@@ -5477,7 +5437,7 @@ function bindEvents() {
             false;
 
           manualLinkButton.textContent =
-            "Link to Master Case";
+            "Link to Zoho Case";
         }
 
         return;
@@ -5530,7 +5490,7 @@ function bindEvents() {
             false;
 
           veloxUnlinkButton.textContent =
-            "Unlink from Master Case";
+            "Unlink from Zoho Case";
         }
 
         return;
@@ -5584,7 +5544,7 @@ function bindEvents() {
             false;
 
           caseVeloxUnlinkButton.textContent =
-            "Unlink Operi Call";
+            "Unlink Velox Call";
         }
 
         return;
@@ -5834,8 +5794,6 @@ function renderDashboard() {
 
   renderDataSourceStatus();
   renderKpis();
-  renderRecentCases();
-  renderSourceHealth();
   renderCaseTable();
   renderUnmatched();
   renderVeloxTable();
