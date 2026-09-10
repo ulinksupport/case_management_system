@@ -551,6 +551,27 @@ function cloneDummySnapshot(reason = "") {
   };
 }
 
+function formatChronologyDate(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value || "";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-SG",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Singapore"
+    }
+  ).format(date);
+}
+
 function formatTicketDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -3818,76 +3839,31 @@ function renderMasterChronology(caseItem) {
   const chronologyHtml =
     chronology
       .map((item) => {
-        const channels =
-          Array.isArray(item.channels)
-            ? item.channels.join(" · ")
-            : "";
 
         return `
-          <article
-            class="timeline-entry chronology-entry chronology-${escapeHtml(
+        <article
+          class="chronology-entry chronology-${escapeHtml(
           item.status || "information"
         )}"
-          >
-            <div class="timeline-node chronology-node">
-              •
-            </div>
+        >
 
-            <div class="timeline-card chronology-card">
-              <div class="chronology-meta">
-                <div class="chronology-actor">
-                  ${escapeHtml(
-          item.actor ||
-          "Not identified"
+          <div class="chronology-title">
+            ${escapeHtml(
+          formatChronologyDate(item.timestamp)
         )}
-                </div>
+            — 
+            ${escapeHtml(item.actor || "Not identified")}
+          </div>
 
-                <div class="chronology-meta-detail">
-                  <span>
-                    ${escapeHtml(
-          item.timestamp || ""
-        )}
-                  </span>
+          <div class="chronology-action">
+            ${escapeHtml(item.title || "")}
+          </div>
 
-                  ${channels
-            ? `
-                      <span class="chronology-meta-separator">
-                        ·
-                      </span>
+          <div class="chronology-copy">
+            ${escapeHtml(item.summary || "")}
+          </div>
 
-                      <span>
-                        ${escapeHtml(channels)}
-                      </span>
-                    `
-            : ""
-          }
-                </div>
-              </div>
-
-              <div class="timeline-title">
-                ${escapeHtml(
-            item.title || ""
-          )}
-              </div>
-
-              <div class="timeline-preview chronology-copy">
-                ${escapeHtml(
-            item.summary || ""
-          )}
-              </div>
-
-              <div class="match-line">
-                <span class="match-signals">
-                  ${escapeHtml(
-            String(
-              item.status ||
-              "information"
-            ).toUpperCase()
-          )}
-                </span>
-              </div>
-            </div>
-          </article>
+        </article>
         `;
       })
       .join("");
