@@ -1522,7 +1522,6 @@ const elements = {
     document.getElementById("aiSummaryTimeline"),
   timelineCount: document.getElementById("timelineCount"),
   ticketTableBody: document.getElementById("ticketTableBody"),
-  matchingTableBody: document.getElementById("matchingTableBody"),
   aiPanel: document.getElementById("aiPanel"),
   caseRecord: document.getElementById("caseRecord"),
 
@@ -1531,9 +1530,6 @@ const elements = {
 
   caseMediaCount:
     document.getElementById("caseMediaCount"),
-
-  matchingSummary:
-    document.getElementById("matchingSummary"),
   navVeloxCount: document.getElementById("navVeloxCount"),
   veloxSummary: document.getElementById("veloxSummary"),
   veloxSearch: document.getElementById("veloxSearch"),
@@ -3292,16 +3288,6 @@ function renderCaseDetail(caseItem) {
         </tr>
       `;
 
-  elements.matchingTableBody.innerHTML = sortInteractions(caseItem.interactions).map((item) => `
-    <tr>
-      <td>${escapeHtml(item.id)}</td>
-      <td><strong>${escapeHtml(item.confidence)}%</strong></td>
-      <td>${escapeHtml(getStrongIdentifiers(item, caseItem))}</td>
-      <td>${escapeHtml(item.signals)}</td>
-      <td><span class="pill ${item.confidence >= 90 ? "green" : "amber"}">${item.confidence >= 90 ? "Auto-linked" : "Flagged"}</span></td>
-    </tr>
-  `).join("");
-
   elements.aiPanel.innerHTML = `
     <div class="ai-section">
       <div class="ai-label">Case summary</div>
@@ -3501,28 +3487,6 @@ function renderCaseDetail(caseItem) {
         state.preservedVeloxSelection;
     }
   }
-
-  elements.matchingSummary.innerHTML = caseItem.matchingSummary.map((item) => `
-    <div class="match-box">
-      <div class="match-box-head">
-        <span class="match-box-title">${escapeHtml(item.title)}</span>
-        <span class="pill ${item.statusClass ||
-    (
-      item.status === "Matched" ||
-        item.status === "Consistent" ||
-        item.status === "Linked"
-        ? "green"
-        : item.status === "Not evaluated"
-          ? "grey"
-          : "amber"
-    )
-    }">
-          ${escapeHtml(item.status)}
-        </span>
-      </div>
-      <div class="match-box-copy">${escapeHtml(item.copy)}</div>
-    </div>
-  `).join("");
 
   activateTab(activeTabBeforeRender);
 

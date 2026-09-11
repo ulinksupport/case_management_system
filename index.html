@@ -358,7 +358,6 @@
                 <button class="tab active" data-tab="timeline" type="button">Unified Timeline</button>
                 <button class="tab" data-tab="ai-summary" type="button">AI Summary</button>
                 <button class="tab" data-tab="tickets" type="button">Linked Tickets</button>
-                <button class="tab" data-tab="matching" type="button">Linking Evidence</button>
               </div>
 
               <div class="tab-panel active" id="tab-timeline">
@@ -395,23 +394,6 @@
                       </tr>
                     </thead>
                     <tbody id="ticketTableBody"></tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="tab-panel" id="tab-matching">
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Interaction</th>
-                        <th>Confidence</th>
-                        <th>Strong Identifiers</th>
-                        <th>Supporting Context</th>
-                        <th>Decision</th>
-                      </tr>
-                    </thead>
-                    <tbody id="matchingTableBody"></tbody>
                   </table>
                 </div>
               </div>
@@ -458,15 +440,6 @@
                 </div>
               </section>
 
-              <section class="card">
-                <div class="card-header">
-                  <div>
-                    <h2>Linking Summary</h2>
-                    <p>Backend-generated evidence</p>
-                  </div>
-                </div>
-                <div class="matching-summary" id="matchingSummary"></div>
-              </section>
             </aside>
           </div>
         </section>
