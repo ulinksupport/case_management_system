@@ -3206,6 +3206,19 @@ function renderCaseDetail(caseItem) {
     )}
         </span>
 
+        ${caseItem.zohoTicketId
+      ? `
+      <button
+        class="media-view-button zoho-ticket-open-button"
+        type="button"
+        data-zoho-ticket-id="${escapeHtml(caseItem.zohoTicketId)}"
+      >
+        Open in Zoho ↗
+      </button>
+    `
+      : ""
+    }
+
         ${getLinkedVeloxInteractions(caseItem).length
       ? `
               <button
@@ -3275,6 +3288,19 @@ function renderCaseDetail(caseItem) {
             >
               Open ${escapeHtml(ticket.associatedType || "Linked")} Case ↗
             </button>
+
+            ${ticket.ticketId
+          ? `
+                  <button
+                    type="button"
+                    class="media-view-button zoho-ticket-open-button"
+                    data-zoho-ticket-id="${escapeHtml(ticket.ticketId)}"
+                  >
+                    Open in Zoho ↗
+                  </button>
+                `
+          : ""
+        }
           </td>
         </tr>
       `).join("")
@@ -4927,6 +4953,25 @@ function openLinkedTicketInNewTab(ticketId) {
   );
 }
 
+function openZohoTicketInNewTab(ticketId) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!normalizedTicketId) {
+    return;
+  }
+
+  const url =
+    `https://desk.zoho.com/support/ulink/ShowHomePage.do` +
+    `#Cases/dv/${encodeURIComponent(normalizedTicketId)}`;
+
+  window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
 function handleGlobalSearch() {
   const query = elements.globalSearch.value.trim().toLowerCase();
   if (!query) return;
@@ -5572,6 +5617,19 @@ function bindEvents() {
       if (linkedTicketTarget) {
         openLinkedTicketInNewTab(
           linkedTicketTarget.dataset.linkedTicketId
+        );
+
+        return;
+      }
+
+      const zohoTicketTarget =
+        event.target.closest(
+          ".zoho-ticket-open-button"
+        );
+
+      if (zohoTicketTarget) {
+        openZohoTicketInNewTab(
+          zohoTicketTarget.dataset.zohoTicketId
         );
 
         return;
