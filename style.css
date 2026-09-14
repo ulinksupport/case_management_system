@@ -923,6 +923,67 @@ tbody tr:last-child td {
   margin-bottom: 14px;
 }
 
+.timeline-ticket-group {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.timeline-ticket-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 11px 14px;
+  color: #263548;
+  background: var(--surface-soft);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+  list-style: none;
+}
+
+.timeline-ticket-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeline-ticket-group summary::before {
+  content: "›";
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  flex: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--brand);
+  background: #fff;
+  font-size: 13px;
+  transition: transform 0.15s ease;
+}
+
+.timeline-ticket-group[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.timeline-group-count {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #eef2f6;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.timeline-ticket-group-content {
+  padding: 12px 13px 2px;
+  border-top: 1px solid var(--border);
+}
+
 .segment-control {
   display: inline-flex;
   gap: 3px;

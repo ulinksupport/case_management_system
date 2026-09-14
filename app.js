@@ -1518,10 +1518,15 @@ const elements = {
   backButton: document.getElementById("backButton"),
   caseHero: document.getElementById("caseHero"),
   timelineContainer: document.getElementById("timelineContainer"),
+
   aiSummaryTimeline:
     document.getElementById("aiSummaryTimeline"),
-  timelineCount: document.getElementById("timelineCount"),
-  ticketTableBody: document.getElementById("ticketTableBody"),
+
+  timelineCount:
+    document.getElementById("timelineCount"),
+
+  ticketTableBody:
+    document.getElementById("ticketTableBody"),
   aiPanel: document.getElementById("aiPanel"),
   caseRecord: document.getElementById("caseRecord"),
 
@@ -3936,18 +3941,35 @@ function renderMasterChronology(caseItem) {
 }
 
 function renderTimeline(caseItem) {
-  const veloxInteractions =
-    getLinkedVeloxInteractions(
-      caseItem
-    );
+  const isChild =
+    String(
+      caseItem.associatedType ?? ""
+    ).trim().toLowerCase() === "child";
 
-  const interactions =
-    sortInteractions([
-      ...(caseItem.interactions ?? []),
-      ...veloxInteractions
-    ]);
+  /*
+    ALL:
+    Parent / unidentified case = Master Chronology.
+    Child case = show a message instead.
+  */
+  if (
+    state.activeTimelineChannel === "all"
+  ) {
+    if (isChild) {
+      elements.timelineContainer.classList.remove(
+        "master-chronology-mode"
+      );
 
-  if (state.activeTimelineChannel === "all") {
+      elements.timelineCount.textContent = "0";
+
+      elements.timelineContainer.innerHTML = `
+        <div class="empty-state">
+          Complete chronology is available under the Parent ticket.
+        </div>
+      `;
+
+      return;
+    }
+
     renderMasterChronology(caseItem);
     return;
   }
@@ -3956,193 +3978,337 @@ function renderTimeline(caseItem) {
     "master-chronology-mode"
   );
 
-  const filtered =
-    state.activeTimelineChannel === "email"
-      ? interactions.filter(
-        (item) =>
-          item.channel === "email" ||
-          item.channel === "comment"
-      )
-      : interactions.filter(
-        (item) =>
-          item.channel ===
-          state.activeTimelineChannel
-      );
+  if (
+    state.activeTimelineChannel === "email" ||
+    state.activeTimelineChannel === "whatsapp"
+  ) {
+    renderGroupedTicketTimeline(
+      caseItem,
+      state.activeTimelineChannel
+    );
 
-  elements.timelineCount.textContent = filtered.length;
-
-  if (!filtered.length) {
-    elements.timelineContainer.innerHTML = `<div class="empty-state">No ${escapeHtml(state.activeTimelineChannel)} interactions found.</div>`;
     return;
   }
 
-  elements.timelineContainer.innerHTML = filtered.map((item) => `
-    <article class="timeline-entry" data-channel="${escapeHtml(item.channel)}" data-interaction-id="${escapeHtml(item.id)}" >
-      <div class="timeline-node ${escapeHtml(item.channel)}">${escapeHtml(getChannelLabel(item.channel))}</div>
+  if (
+    state.activeTimelineChannel === "velox"
+  ) {
+    renderGroupedVeloxTimeline(
+      caseItem
+    );
+
+    return;
+  }
+
+  elements.timelineCount.textContent = "0";
+
+  elements.timelineContainer.innerHTML = `
+    <div class="empty-state">
+      No interactions found.
+    </div>
+  `;
+}
+
+async function renderGroupedTicketTimeline(
+  caseItem,
+  channel
+) {
+  const currentTicketId =
+    String(
+      caseItem.zohoTicketId ?? ""
+    ).trim();
+
+  const relatedTickets =
+    Array.isArray(caseItem.relatedTickets)
+      ? caseItem.relatedTickets
+      : [];
+
+  const tickets = [
+    {
+      ticketId: currentTicketId,
+      ticketNumber:
+        String(
+          caseItem.tickets?.[0]?.id ?? ""
+        ).replace(/^ZD-/i, ""),
+      associatedType:
+        String(
+          caseItem.associatedType ?? ""
+        ).trim() || "Parent",
+      interactions:
+        Array.isArray(caseItem.interactions)
+          ? caseItem.interactions
+          : null
+    },
+
+    ...relatedTickets
+      .filter(
+        ticket =>
+          ticket.ticketId &&
+          ticket.ticketId !== currentTicketId
+      )
+      .map(ticket => ({
+        ticketId:
+          String(
+            ticket.ticketId
+          ).trim(),
+
+        ticketNumber:
+          String(
+            ticket.ticketNumber ?? ""
+          ).trim(),
+
+        associatedType:
+          String(
+            ticket.associatedType ?? ""
+          ).trim() || "Child",
+
+        interactions: null
+      }))
+  ];
+
+  elements.timelineContainer.innerHTML =
+    tickets.map((ticket, index) => {
+
+      const label =
+        ticket.associatedType === "Child"
+          ? `Child Ticket${ticket.ticketNumber ? ` — ZD-${ticket.ticketNumber}` : ""}`
+          : `Parent Ticket${ticket.ticketNumber ? ` — ZD-${ticket.ticketNumber}` : ""}`;
+
+      return `
+        <details
+          class="timeline-ticket-group"
+          data-ticket-group-id="${escapeHtml(
+        ticket.ticketId
+      )}"
+          data-ticket-group-channel="${escapeHtml(
+        channel
+      )}"
+          data-ticket-group-loaded="${ticket.interactions !== null
+          ? "true"
+          : "false"
+        }"
+        >
+
+          <summary>
+            <span>
+              ${escapeHtml(label)}
+            </span>
+
+            <span class="timeline-group-count">
+              ${ticket.interactions !== null
+          ? ticket.interactions.filter(
+            item =>
+              channel === "email"
+                ? (
+                  item.channel === "email" ||
+                  item.channel === "comment"
+                )
+                : item.channel === channel
+          ).length
+          : "Load"
+        }
+            </span>
+          </summary>
+
+          <div
+            class="timeline-ticket-group-content"
+            data-ticket-group-content="${escapeHtml(
+          ticket.ticketId
+        )}"
+          >
+            ${ticket.interactions !== null
+          ? renderTimelineInteractions(
+            ticket.interactions.filter(
+              item =>
+                channel === "email"
+                  ? (
+                    item.channel === "email" ||
+                    item.channel === "comment"
+                  )
+                  : item.channel === channel
+            )
+          )
+          : `
+                  <div class="empty-state">
+                    Expand to load ticket history.
+                  </div>
+                `
+        }
+          </div>
+
+        </details>
+      `;
+    }).join("");
+
+  elements.timelineCount.textContent =
+    tickets.reduce(
+      (total, ticket) => {
+        if (!ticket.interactions) {
+          return total;
+        }
+
+        return (
+          total +
+          ticket.interactions.filter(
+            item =>
+              channel === "email"
+                ? (
+                  item.channel === "email" ||
+                  item.channel === "comment"
+                )
+                : item.channel === channel
+          ).length
+        );
+      },
+      0
+    );
+}
+
+function renderTimelineInteractions(interactions) {
+  if (!interactions.length) {
+    return `
+      <div class="empty-state">
+        No interactions found.
+      </div>
+    `;
+  }
+
+  return interactions.map((item) => `
+    <article
+      class="timeline-entry"
+      data-channel="${escapeHtml(item.channel)}"
+      data-interaction-id="${escapeHtml(item.id)}"
+    >
+      <div class="timeline-node ${escapeHtml(item.channel)}">
+        ${escapeHtml(getChannelLabel(item.channel))}
+      </div>
+
       <div class="timeline-card">
+
         <div class="timeline-meta">
-          <span class="timeline-channel">${escapeHtml(formatChannelName(item.channel))} · ${escapeHtml(item.party)}</span>
-          <span class="timeline-time">${escapeHtml(item.time)}</span>
-          <span class="timeline-source">${escapeHtml(item.source)} · ${escapeHtml(item.id)}</span>
+          <span class="timeline-channel">
+            ${escapeHtml(formatChannelName(item.channel))}
+            ·
+            ${escapeHtml(item.party)}
+          </span>
+
+          <span class="timeline-time">
+            ${escapeHtml(item.time)}
+          </span>
+
+          <span class="timeline-source">
+            ${escapeHtml(item.source)}
+          </span>
         </div>
+
         <div class="timeline-title">
-  ${escapeHtml(item.title)}
-</div>
+          ${escapeHtml(item.title)}
+        </div>
 
-
-${(
+        ${(
       item.channel === "email" ||
       item.channel === "comment"
     ) && item.aiSummary
       ? `
-    <div class="thread-ai-summary">
-      <div class="thread-ai-summary-label">
-        AI SUMMARY
-      </div>
+              <div class="thread-ai-summary">
+                <div class="thread-ai-summary-label">
+                  AI SUMMARY
+                </div>
 
-      <div class="thread-ai-summary-text">
-        ${escapeHtml(
-        item.aiSummary
-      )}
-      </div>
-    </div>
-  `
+                <div class="thread-ai-summary-text">
+                  ${escapeHtml(item.aiSummary)}
+                </div>
+              </div>
+            `
       : ""
     }
 
-<div
-  class="timeline-preview ${item.channel === "email"
+        <div
+          class="timeline-preview ${item.channel === "email"
       ? "timeline-preview-collapsed"
       : ""
     }"
->
-  ${escapeHtml(
+        >
+          ${escapeHtml(
       formatTimelineContent(item.content)
     )}
-</div>
+        </div>
 
-${item.channel === "email"
+        ${item.channel === "email"
       ? `
-      <button
-        class="timeline-read-more"
-        type="button"
-      >
-        Read more
-      </button>
-    `
+              <button
+                class="timeline-read-more"
+                type="button"
+              >
+                Read more
+              </button>
+            `
       : ""
     }
 
-${item.attachments.length
+        ${item.attachments?.length
       ? `
-      <div class="attachment-list">
-        ${item.attachments
+              <div class="attachment-list">
+                ${item.attachments
         .map(
           (file) => `
-              <span class="attachment-chip">
-                ${escapeHtml(file)}
-              </span>
-            `
+                      <span class="attachment-chip">
+                        ${escapeHtml(file)}
+                      </span>
+                    `
         )
         .join("")}
-      </div>
-    `
+              </div>
+            `
       : ""
     }
-        <div class="match-line">
-          <span class="match-signals">
-            ${escapeHtml(item.signals)}
-          </span>
 
-          ${item.confidence !== null &&
-      item.confidence !== undefined &&
-      String(item.confidence).trim() !== ""
-      ? `
-                <span class="pill ${Number(item.confidence) >= 90
-        ? "green"
-        : "amber"
-      }">
-                  ${escapeHtml(item.confidence)}%
-                </span>
-              `
-      : ""
-    }
-        </div>
       </div>
     </article>
   `).join("");
+}
 
-  /*
-  Restore emails Ops had expanded before
-  the 5-second background refresh.
-*/
-  elements.timelineContainer
-    .querySelectorAll(
-      ".timeline-entry"
-    )
-    .forEach(entry => {
-      const interactionId =
-        entry.dataset.interactionId;
+function renderGroupedVeloxTimeline(caseItem) {
+  const linkedVelox =
+    getLinkedVeloxInteractions(caseItem);
 
-      if (
-        !interactionId ||
-        !state.expandedTimelineIds.has(
-          interactionId
-        )
-      ) {
-        return;
+  elements.timelineCount.textContent =
+    linkedVelox.length;
+
+  if (!linkedVelox.length) {
+    elements.timelineContainer.innerHTML = `
+      <div class="empty-state">
+        No linked Operi calls found.
+      </div>
+    `;
+    return;
+  }
+
+  elements.timelineContainer.innerHTML =
+    linkedVelox.map((item, index) => `
+      <details
+        class="timeline-ticket-group velox-call-group"
+        ${index === 0 ? "open" : ""}
+      >
+        <summary>
+          <span>
+            Call ${index + 1}
+            ${item.time
+        ? ` — ${escapeHtml(item.time)}`
+        : ""
       }
+          </span>
 
-      const preview =
-        entry.querySelector(
-          ".timeline-preview"
-        );
+          <span class="timeline-group-count">
+            Transcript
+          </span>
+        </summary>
 
-      const button =
-        entry.querySelector(
-          ".timeline-read-more"
-        );
-
-      if (preview) {
-        preview.classList.add(
-          "expanded"
-        );
-      }
-
-      if (button) {
-        button.textContent =
-          "Show less";
-      }
-    });
-
-  elements.timelineContainer
-    .querySelectorAll(
-      ".timeline-preview-collapsed"
-    )
-    .forEach((preview) => {
-      const button =
-        preview.nextElementSibling;
-
-      if (
-        !button ||
-        !button.classList.contains(
-          "timeline-read-more"
-        )
-      ) {
-        return;
-      }
-
-      /*
-        Hide Read more when the email
-        already fits within 3 lines.
-      */
-      if (
-        preview.scrollHeight <=
-        preview.clientHeight + 2
-      ) {
-        button.hidden = true;
-      }
-    });
+        <div class="timeline-ticket-group-content">
+          ${renderTimelineInteractions([item])}
+        </div>
+      </details>
+    `).join("");
 }
 
 function renderAiSummaryTimeline(caseItem) {
@@ -5668,6 +5834,115 @@ function bindEvents() {
         }
       }
 
+      const ticketGroup =
+        event.target.closest(
+          ".timeline-ticket-group"
+        );
+
+      if (
+        ticketGroup &&
+        ticketGroup.open &&
+        ticketGroup.dataset.ticketGroupLoaded !== "true"
+      ) {
+        const ticketId =
+          String(
+            ticketGroup.dataset.ticketGroupId || ""
+          ).trim();
+
+        const channel =
+          ticketGroup.dataset.ticketGroupChannel || "";
+
+        if (!ticketId) {
+          return;
+        }
+
+        const content =
+          ticketGroup.querySelector(
+            ".timeline-ticket-group-content"
+          );
+
+        if (content) {
+          content.innerHTML = `
+      <div class="empty-state">
+        Loading ticket history…
+      </div>
+    `;
+        }
+
+        fetchZohoTicketDetail(ticketId)
+          .then((detail) => {
+
+            const interactions =
+              Array.isArray(detail.interactions)
+                ? detail.interactions
+                : [];
+
+            state.detailCache.set(
+              ticketId,
+              {
+                interactions,
+                totalThreads:
+                  detail.totalThreads,
+                totalComments:
+                  detail.totalComments
+              }
+            );
+
+            const filtered =
+              channel === "email"
+                ? interactions.filter(
+                  (item) =>
+                    item.channel === "email" ||
+                    item.channel === "comment"
+                )
+                : interactions.filter(
+                  (item) =>
+                    item.channel === channel
+                );
+
+            if (content) {
+              content.innerHTML =
+                renderTimelineInteractions(
+                  filtered
+                );
+            }
+
+            ticketGroup.dataset.ticketGroupLoaded =
+              "true";
+
+            const count =
+              ticketGroup.querySelector(
+                ".timeline-group-count"
+              );
+
+            if (count) {
+              count.textContent =
+                filtered.length;
+            }
+
+            elements.timelineCount.textContent =
+              document.querySelectorAll(
+                ".timeline-entry"
+              ).length;
+
+          })
+          .catch((error) => {
+
+            console.error(
+              "Unable to load ticket history:",
+              error
+            );
+
+            if (content) {
+              content.innerHTML = `
+          <div class="empty-state">
+            Unable to load ticket history.
+          </div>
+        `;
+            }
+          });
+      }
+
       const segment = event.target.closest("#timelineFilters .segment");
       if (segment && state.selectedCaseId) {
         document.querySelectorAll("#timelineFilters .segment").forEach((item) => item.classList.remove("active"));
@@ -6019,6 +6294,24 @@ async function initializeDashboard() {
     showToast("Unable to load the dashboard data.");
   }
 }
+
+document.addEventListener(
+  "change",
+  (event) => {
+    const timelineTicketSelect =
+      event.target.closest(
+        "#timelineTicketSelect"
+      );
+
+    if (!timelineTicketSelect) {
+      return;
+    }
+
+    switchTimelineTicket(
+      timelineTicketSelect.value
+    );
+  }
+);
 
 async function initializeAuth() {
   try {
