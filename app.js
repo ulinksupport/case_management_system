@@ -1952,23 +1952,49 @@ function renderCaseTable() {
 
   elements.caseTableBody.innerHTML =
     filtered.map((item) => {
-      const hasOperiLink =
-        linkedMasterCaseIds.has(
-          String(item.id || "").trim()
-        ) ||
-        linkedZohoTicketIds.has(
-          String(
-            item.zohoTicketId || ""
-          ).trim()
-        );
+      const caseZohoTicketId =
+        String(
+          item.zohoTicketId || ""
+        ).trim();
+
+      const veloxLinkedCount =
+        state.veloxTranscripts.filter(
+          (transcript) => {
+
+            if (
+              String(
+                transcript.linkStatus || ""
+              ).toLowerCase() !== "linked"
+            ) {
+              return false;
+            }
+
+            const linkedTickets =
+              Array.isArray(
+                transcript.linkedZohoTickets
+              )
+                ? transcript.linkedZohoTickets
+                : [];
+
+            return linkedTickets.some(
+              (ticketId) =>
+                String(
+                  ticketId || ""
+                )
+                  .replace(/^ZD-/i, "")
+                  .trim() ===
+                caseZohoTicketId
+            );
+          }
+        ).length;
 
       const displayLinkText =
-        hasOperiLink
-          ? "Linked"
+        veloxLinkedCount > 0
+          ? `${veloxLinkedCount} Velox linked`
           : "Not Linked";
 
       const displayLinkClass =
-        hasOperiLink
+        veloxLinkedCount > 0
           ? "green"
           : "grey";
 
@@ -2232,6 +2258,7 @@ async function refreshVeloxData() {
       transcripts;
 
     renderVeloxTable();
+    renderCaseTable();
 
     if (state.selectedCaseId) {
       const selectedCase =
