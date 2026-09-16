@@ -3404,14 +3404,39 @@ function renderCaseDetail(caseItem) {
         ?.dataset.tab || "timeline"
       : "timeline";
 
+  const isChildCase =
+    String(
+      caseItem?.associatedType ?? ""
+    )
+      .trim()
+      .toLowerCase() === "child";
+
   const activeChannelBeforeRender =
     isRefreshingSameCase
       ? state.activeTimelineChannel
       : "all";
 
+  const safeActiveTab =
+    isChildCase &&
+      activeTabBeforeRender === "ai-summary"
+      ? "timeline"
+      : activeTabBeforeRender;
+
   state.selectedCaseId = caseItem.id;
   state.activeTimelineChannel =
     activeChannelBeforeRender;
+
+  const aiSummaryTab =
+    document.getElementById(
+      "aiSummaryTab"
+    );
+
+  if (aiSummaryTab) {
+    aiSummaryTab.style.display =
+      isChildCase
+        ? "none"
+        : "";
+  }
 
   elements.caseHero.innerHTML = `
     <div class="hero-top">
@@ -3544,7 +3569,10 @@ function renderCaseDetail(caseItem) {
   `;
 
   renderTimeline(caseItem);
-  renderAiSummaryTimeline(caseItem);
+
+  if (!isChildCase) {
+    renderAiSummaryTimeline(caseItem);
+  }
 
   const relatedTickets =
     Array.isArray(caseItem.relatedTickets)
@@ -3848,7 +3876,7 @@ function renderCaseDetail(caseItem) {
     );
   }
 
-  activateTab(activeTabBeforeRender);
+  activateTab(safeActiveTab);
 
   document
     .querySelectorAll("#timelineFilters .segment")
