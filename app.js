@@ -1058,10 +1058,41 @@ async function fetchVeloxTranscripts() {
             item.linkedMasterCase ?? ""
           ).trim(),
 
-        linkedZohoTicket:
-          String(
-            item.linkedZohoTicket ?? ""
-          ).trim(),
+        linkedZohoTickets: (() => {
+          const value =
+            item.linkedZohoTickets ??
+            item.linked_zoho_tickets ??
+            "";
+
+          if (Array.isArray(value)) {
+            return value
+              .map(id => String(id).trim())
+              .filter(Boolean);
+          }
+
+          if (typeof value === "string") {
+            try {
+              const parsed = JSON.parse(value);
+
+              if (Array.isArray(parsed)) {
+                return parsed
+                  .map(id => String(id).trim())
+                  .filter(Boolean);
+              }
+            } catch {
+              // Fall back to the legacy single-link field.
+            }
+          }
+
+          const legacy =
+            String(
+              item.linkedZohoTicket ?? ""
+            ).trim();
+
+          return legacy
+            ? [legacy]
+            : [];
+        })(),
 
         updatedAt:
           String(item.updatedAt ?? "").trim(),
@@ -1487,7 +1518,7 @@ const state = {
 
   // Keep Ops UI choices during background refresh.
   preservedVeloxSearch: "",
-  preservedVeloxSelection: "",
+  preservedVeloxSelection: [],
   expandedTimelineIds: new Set()
 };
 
@@ -1826,6 +1857,30 @@ function renderCaseTable() {
   const relationship =
     state.relationshipFilter || "all";
 
+  const linkedZohoTicketIds =
+    new Set(
+      state.veloxTranscripts
+        .filter(
+          (transcript) =>
+            String(
+              transcript.linkStatus || ""
+            ).toLowerCase() === "linked"
+        )
+        .flatMap(
+          (transcript) =>
+            Array.isArray(
+              transcript.linkedZohoTickets
+            )
+              ? transcript.linkedZohoTickets
+              : []
+        )
+        .map(
+          (id) =>
+            String(id ?? "").trim()
+        )
+        .filter(Boolean)
+    );
+
   const linkedMasterCaseIds =
     new Set(
       state.veloxTranscripts
@@ -1872,7 +1927,19 @@ function renderCaseTable() {
       && (match === "all" || item.matchState === match)
       && (
         relationship === "all" ||
-        item.associatedType === relationship
+        (
+          relationship === "Parent" &&
+          (
+            item.associatedType === "Parent" ||
+            !String(
+              item.associatedType ?? ""
+            ).trim()
+          )
+        ) ||
+        (
+          relationship === "Child" &&
+          item.associatedType === "Child"
+        )
       );
   });
 
@@ -1888,6 +1955,11 @@ function renderCaseTable() {
       const hasOperiLink =
         linkedMasterCaseIds.has(
           String(item.id || "").trim()
+        ) ||
+        linkedZohoTicketIds.has(
+          String(
+            item.zohoTicketId || ""
+          ).trim()
         );
 
       const displayLinkText =
@@ -2055,18 +2127,16 @@ function renderVeloxTable() {
           .join(" · ") ||
           "Not available";
 
-        const linkedRecord = [
-          String(
-            item.linkedMasterCase ?? ""
-          ).trim(),
-
-          String(
-            item.linkedZohoTicket ?? ""
-          ).trim()
-        ]
-          .filter(Boolean)
-          .join(" · ") ||
-          "Not linked";
+        const linkedRecord =
+          Array.isArray(
+            item.linkedZohoTickets
+          ) &&
+            item.linkedZohoTickets.length
+            ? `${item.linkedZohoTickets.length} Zoho Case${item.linkedZohoTickets.length === 1
+              ? ""
+              : "s"
+            } linked`
+            : "Not linked";
 
         return `
           <tr
@@ -2210,18 +2280,12 @@ async function refreshVeloxData() {
 
 async function submitManualVeloxLink(
   veloxId,
-  caseId
+  caseIds
 ) {
   const transcript =
     state.veloxTranscripts.find(
       (item) =>
         item.id === veloxId
-    );
-
-  const caseItem =
-    state.cases.find(
-      (item) =>
-        item.id === caseId
     );
 
   if (!transcript) {
@@ -2230,36 +2294,75 @@ async function submitManualVeloxLink(
     );
   }
 
-  if (!caseItem) {
+  const selectedCaseIds = [
+    ...new Set(
+      (Array.isArray(caseIds)
+        ? caseIds
+        : [caseIds]
+      )
+        .map(id => String(id).trim())
+        .filter(Boolean)
+    )
+  ];
+
+  if (!selectedCaseIds.length) {
     throw new Error(
-      "Zoho Case not found."
+      "At least one Zoho Case must be selected."
     );
   }
 
-  const zohoTicketId =
-    String(
-      caseItem.zohoTicketId || ""
-    ).trim();
+  const selectedCases =
+    selectedCaseIds
+      .map(caseId =>
+        state.cases.find(
+          item =>
+            item.id === caseId
+        )
+      )
+      .filter(Boolean);
 
-  if (!zohoTicketId) {
+  if (
+    selectedCases.length !==
+    selectedCaseIds.length
+  ) {
     throw new Error(
-      "Zoho Case has no ticket ID."
+      "One or more selected Zoho Cases could not be found."
+    );
+  }
+
+  const zohoTicketIds =
+    selectedCases
+      .map(
+        caseItem =>
+          String(
+            caseItem.zohoTicketId || ""
+          ).trim()
+      )
+      .filter(Boolean);
+
+  if (
+    zohoTicketIds.length !==
+    selectedCases.length
+  ) {
+    throw new Error(
+      "One or more selected Zoho Cases has no ticket ID."
     );
   }
 
   const body =
     new URLSearchParams({
-      action:
-        "link",
+      action: "link",
 
       record_id:
         transcript.id,
 
       linked_master_case:
-        caseItem.id,
+        selectedCases[0].id,
 
-      linked_zoho_ticket:
-        zohoTicketId
+      linked_zoho_tickets:
+        JSON.stringify(
+          zohoTicketIds
+        )
     });
 
   const response =
@@ -2287,10 +2390,13 @@ async function submitManualVeloxLink(
   }
 
   transcript.linkedMasterCase =
-    caseItem.id;
+    selectedCases[0].id;
+
+  transcript.linkedZohoTickets =
+    zohoTicketIds;
 
   transcript.linkedZohoTicket =
-    zohoTicketId;
+    zohoTicketIds[0];
 
   transcript.linkStatus =
     "linked";
@@ -2366,6 +2472,72 @@ async function submitManualVeloxUnlink(
 
   transcript.linkReason =
     "Manually unlinked by Ops";
+
+  await refreshVeloxData();
+}
+
+async function submitManualVeloxTicketUnlink(
+  veloxId,
+  zohoTicketId
+) {
+
+  const transcript =
+    state.veloxTranscripts.find(
+      (item) =>
+        item.id === veloxId
+    );
+
+  if (!transcript) {
+    throw new Error(
+      "Velox transcript not found."
+    );
+  }
+
+  const normalizedTicketId =
+    String(
+      zohoTicketId || ""
+    ).trim();
+
+  if (!normalizedTicketId) {
+    throw new Error(
+      "Zoho ticket ID is required."
+    );
+  }
+
+  const body =
+    new URLSearchParams({
+      action: "unlink",
+
+      record_id:
+        transcript.id,
+
+      unlink_zoho_ticket:
+        normalizedTicketId
+    });
+
+  const response =
+    await fetch(
+      buildApiUrl(
+        appConfig.endpoints
+          .veloxManualLink
+      ),
+      {
+        method: "POST",
+
+        headers: {
+          Accept:
+            "application/json"
+        },
+
+        body
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Manual ticket unlink returned HTTP ${response.status}`
+    );
+  }
 
   await refreshVeloxData();
 }
@@ -2447,22 +2619,6 @@ function renderVeloxDetail(
       : "Not linked"
     }
           </span>
-
-          ${isLinked
-      ? `
-              <button
-                class="media-view-button"
-                id="veloxManualUnlinkButton"
-                type="button"
-                data-velox-id="${escapeHtml(
-        transcript.id
-      )}"
-              >
-                Unlink
-              </button>
-            `
-      : ""
-    }
         </div>
       </div>
     </div>
@@ -2524,32 +2680,75 @@ function renderVeloxDetail(
         </div>
       </div>
 
-      <div>
-        <div class="info-label">
-          Linked Zoho Case
-        </div>
-
-        <div class="info-value">
-          ${escapeHtml(
-      getVeloxValue(
-        transcript.linkedMasterCase
-      )
-    )}
-        </div>
+      <div class="info-label">
+        Linked Zoho Cases
       </div>
 
-      <div>
-        <div class="info-label">
-          Linked Zoho Ticket
-        </div>
+      <div class="info-value">
+        ${Array.isArray(
+      transcript.linkedZohoTickets
+    ) &&
+      transcript.linkedZohoTickets.length
+      ? transcript.linkedZohoTickets
+        .map(
+          (ticketId) => {
 
-        <div class="info-value">
-          ${escapeHtml(
-      getVeloxValue(
-        transcript.linkedZohoTicket
-      )
-    )}
-        </div>
+            const normalizedTicketId =
+              String(
+                ticketId || ""
+              ).trim();
+
+            const linkedCase =
+              state.cases.find(
+                (caseItem) =>
+                  String(
+                    caseItem.zohoTicketId || ""
+                  ).trim() ===
+                  normalizedTicketId
+              );
+
+            const displayCase =
+              linkedCase?.id ||
+              `ZD-${normalizedTicketId}`;
+
+            return `
+                      <div
+                        style="
+                          display:flex;
+                          align-items:center;
+                          justify-content:space-between;
+                          gap:8px;
+                          margin-bottom:6px;
+                        "
+                      >
+
+                        <span>
+                          ${escapeHtml(
+              displayCase
+            )}
+                        </span>
+
+                        <button
+                          type="button"
+                          class="media-view-button velox-unlink-ticket-button"
+                          data-velox-id="${escapeHtml(
+              transcript.id
+            )}"
+                          data-zoho-ticket-id="${escapeHtml(
+              normalizedTicketId
+            )}"
+                        >
+                          Unlink
+                        </button>
+
+                      </div>
+                    `;
+          }
+        )
+        .join("")
+      : "Not linked"
+    }
+      </div>
       </div>
     </div>
   `;
@@ -2704,15 +2903,21 @@ function renderVeloxDetail(
         placeholder="Search case ID, ticket, name, phone or email..."
       />
 
+      <div class="velox-case-select-label">
+        Select Zoho Cases
+      </div>
+
       <select
         id="veloxManualCaseSelect"
+        multiple
+        size="6"
       >
-        <option value="">
-          Select Case...
-        </option>
-
         ${caseOptions}
       </select>
+
+      <div class="velox-case-select-help">
+        Hold Ctrl and click to select multiple cases.
+      </div>
 
       <button
         class="media-view-button"
@@ -2722,7 +2927,7 @@ function renderVeloxDetail(
       transcript.id
     )}"
       >
-        Link to Zoho Case
+        Link Selected Zoho Cases
       </button>
     </div>
   `;
@@ -3133,7 +3338,16 @@ function renderCaseDetail(caseItem) {
 
     if (veloxSelect) {
       state.preservedVeloxSelection =
-        veloxSelect.value;
+        Array.from(
+          veloxSelect.selectedOptions || []
+        )
+          .map(
+            option =>
+              String(
+                option.value || ""
+              ).trim()
+          )
+          .filter(Boolean);
     }
 
     state.expandedTimelineIds =
@@ -3152,7 +3366,7 @@ function renderCaseDetail(caseItem) {
       );
   } else {
     state.preservedVeloxSearch = "";
-    state.preservedVeloxSelection = "";
+    state.preservedVeloxSelection = [];
     state.expandedTimelineIds =
       new Set();
   }
@@ -3223,25 +3437,76 @@ function renderCaseDetail(caseItem) {
     `
       : ""
     }
-
-        ${getLinkedVeloxInteractions(caseItem).length
-      ? `
-              <button
-                class="media-view-button velox-unlink-case-button"
-                type="button"
-                data-velox-id="${escapeHtml(
-        getLinkedVeloxInteractions(
-          caseItem
-        )[0].veloxId
-      )}"
-              >
-                Unlink Velox Call
-              </button>
-            `
-      : ""
-    }
       </div>
     </div>
+
+    <div class="linked-velox-case-section">
+
+  <div class="info-label">
+    Linked Velox Calls
+  </div>
+
+      <div class="linked-velox-list">
+
+        ${getLinkedVeloxInteractions(caseItem).length
+      ? getLinkedVeloxInteractions(caseItem)
+        .map((velox) => {
+
+          const transcript =
+            state.veloxTranscripts.find(
+              item =>
+                item.id === velox.veloxId
+            );
+
+          const fileName =
+            transcript?.fileName ||
+            velox.title ||
+            velox.veloxId;
+
+          return `
+                    <div class="linked-velox-row">
+
+                      <div class="linked-velox-info">
+                        <div class="linked-velox-name">
+                          ${escapeHtml(fileName)}
+                        </div>
+
+                        <div class="linked-velox-meta">
+                          ${escapeHtml(
+            velox.time ||
+            "Date not available"
+          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="media-view-button case-velox-unlink-button"
+                        data-velox-id="${escapeHtml(
+            velox.veloxId
+          )}"
+                        data-zoho-ticket-id="${escapeHtml(
+            caseItem.zohoTicketId
+          )}"
+                      >
+                        Unlink
+                      </button>
+
+                    </div>
+                  `;
+        })
+        .join("")
+      : `
+                <div class="secondary-text">
+                  No linked Velox calls
+                </div>
+              `
+    }
+
+      </div>
+
+    </div>
+
     <div class="hero-grid">
       <div><div class="info-label">Client</div><div class="info-value">${escapeHtml(caseItem.client)}</div></div>
       <div><div class="info-label">Patient Phone</div><div class="info-value">${escapeHtml(caseItem.phone)}</div></div>
@@ -3391,12 +3656,39 @@ function renderCaseDetail(caseItem) {
   const availableVeloxOptions =
     state.veloxTranscripts
       .filter((transcript) => {
-        return (
-          transcript.id &&
+        if (!transcript.id) {
+          return false;
+        }
+
+        const currentZohoId =
           String(
-            transcript.linkStatus || ""
-          ).toLowerCase() !== "linked"
-        );
+            caseItem.zohoTicketId || ""
+          ).trim();
+
+        const currentMasterCase =
+          String(
+            caseItem.id || ""
+          ).trim();
+
+        const linkedZohoTickets =
+          Array.isArray(
+            transcript.linkedZohoTickets
+          )
+            ? transcript.linkedZohoTickets
+            : [];
+
+        const alreadyLinkedToThisCase =
+          linkedZohoTickets.some(
+            id =>
+              String(id).trim() ===
+              currentZohoId
+          ) ||
+          String(
+            transcript.linkedMasterCase || ""
+          ).trim() ===
+          currentMasterCase;
+
+        return !alreadyLinkedToThisCase;
       })
       .map((transcript) => {
         const searchText = [
@@ -3437,7 +3729,7 @@ function renderCaseDetail(caseItem) {
   elements.caseRecord.innerHTML += `
   <div class="velox-manual-link">
     <div class="velox-manual-link-title">
-      Link Velox Call
+      Link Selected Velox Calls
     </div>
 
     <input
@@ -3448,13 +3740,19 @@ function renderCaseDetail(caseItem) {
 
     <select
       id="caseManualVeloxSelect"
+      multiple
+      size="6"
     >
-      <option value="">
-        Select Velox transcript...
+      <option value="" disabled>
+        Select Velox transcript(s)...
       </option>
 
       ${availableVeloxOptions}
     </select>
+
+    <div class="velox-case-select-help">
+      Hold Ctrl and click to select multiple Velox transcripts.
+    </div>
 
     <button
       class="media-view-button"
@@ -3464,7 +3762,7 @@ function renderCaseDetail(caseItem) {
     caseItem.id
   )}"
     >
-      Link Velox Call
+      Link Selected Velox Calls
     </button>
   </div>
 `;
@@ -3502,21 +3800,25 @@ function renderCaseDetail(caseItem) {
   */
   if (
     restoredVeloxSelect &&
-    state.preservedVeloxSelection
+    Array.isArray(
+      state.preservedVeloxSelection
+    )
   ) {
-    const optionStillExists =
-      Array.from(
-        restoredVeloxSelect.options
-      ).some(
-        option =>
-          option.value ===
-          state.preservedVeloxSelection
+    const preservedIds =
+      new Set(
+        state.preservedVeloxSelection
       );
 
-    if (optionStillExists) {
-      restoredVeloxSelect.value =
-        state.preservedVeloxSelection;
-    }
+    Array.from(
+      restoredVeloxSelect.options
+    ).forEach(
+      option => {
+        option.selected =
+          preservedIds.has(
+            option.value
+          );
+      }
+    );
   }
 
   activateTab(activeTabBeforeRender);
@@ -3603,12 +3905,13 @@ function getLinkedVeloxInteractions(
 
   const caseTicketNumbers =
     (caseItem.tickets ?? [])
-      .map((ticket) =>
-        String(
-          ticket.id ?? ""
-        )
-          .replace(/^ZD-/i, "")
-          .trim()
+      .map(
+        (ticket) =>
+          String(
+            ticket.id ?? ""
+          )
+            .replace(/^ZD-/i, "")
+            .trim()
       )
       .filter(Boolean);
 
@@ -3627,33 +3930,46 @@ function getLinkedVeloxInteractions(
           transcript.linkedMasterCase ?? ""
         ).trim();
 
-      const linkedZohoTicket =
-        String(
-          transcript.linkedZohoTicket ?? ""
-        ).trim();
+      const linkedZohoTickets =
+        Array.isArray(
+          transcript.linkedZohoTickets
+        )
+          ? transcript.linkedZohoTickets
+          : [];
+
+      const normalizedZohoTickets =
+        linkedZohoTickets
+          .map(
+            (id) =>
+              String(id ?? "")
+                .replace(/^ZD-/i, "")
+                .trim()
+          )
+          .filter(Boolean);
 
       const masterCaseMatches =
         linkedMasterCase &&
         caseMasterId &&
-        linkedMasterCase === caseMasterId;
+        linkedMasterCase ===
+        caseMasterId;
 
-      const internalZohoMatches =
-        linkedZohoTicket &&
+      const zohoIdMatches =
         caseZohoId &&
-        linkedZohoTicket === caseZohoId;
+        normalizedZohoTickets.includes(
+          caseZohoId
+        );
 
       const ticketNumberMatches =
-        linkedZohoTicket &&
-        caseTicketNumbers.includes(
-          linkedZohoTicket.replace(
-            /^ZD-/i,
-            ""
-          )
+        caseTicketNumbers.some(
+          (ticketNumber) =>
+            normalizedZohoTickets.includes(
+              ticketNumber
+            )
         );
 
       return (
         masterCaseMatches ||
-        internalZohoMatches ||
+        zohoIdMatches ||
         ticketNumberMatches
       );
     })
@@ -3687,7 +4003,8 @@ function getLinkedVeloxInteractions(
 
         timestamp,
 
-        source: "Operi / TurboScribe",
+        source:
+          "Operi / TurboScribe",
 
         title:
           transcript.fileName ||
@@ -3857,6 +4174,15 @@ function renderMasterChronology(caseItem) {
           <div class="chronology-copy">
             ${escapeHtml(item.summary || "")}
           </div>
+
+          ${item.source
+            ? `
+            <div class="chronology-source">
+              ${escapeHtml(item.source)}
+            </div>
+          `
+            : ""
+          }
 
         </article>
         `;
@@ -5317,19 +5643,6 @@ function bindEvents() {
             )
             .join("")}
       `;
-
-        /*
-          Automatically recommend
-          the first matching result.
-        */
-        if (
-          query &&
-          matches.length
-        ) {
-          select.selectedIndex = 1;
-        }
-
-        return;
       }
 
 
@@ -5425,17 +5738,6 @@ function bindEvents() {
             .join("")}
       `;
 
-        /*
-          Automatically recommend
-          first matching result.
-        */
-        if (
-          query &&
-          matches.length
-        ) {
-          select.selectedIndex = 1;
-        }
-
         return;
       }
     }
@@ -5456,10 +5758,17 @@ function bindEvents() {
             "caseManualVeloxSelect"
           );
 
-        const veloxId =
-          String(
-            select?.value || ""
-          ).trim();
+        const selectedVeloxIds =
+          Array.from(
+            select?.selectedOptions || []
+          )
+            .map(
+              option =>
+                String(
+                  option.value || ""
+                ).trim()
+            )
+            .filter(Boolean);
 
         const caseId =
           String(
@@ -5467,33 +5776,42 @@ function bindEvents() {
               .dataset.caseId || ""
           ).trim();
 
-        if (!veloxId) {
+        if (!selectedVeloxIds.length) {
           showToast(
-            "Select a Velox transcript first."
+            "Select at least one Velox transcript."
           );
 
           return;
         }
 
-        caseVeloxLinkButton.disabled =
-          true;
+        caseVeloxLinkButton.disabled = true;
 
         caseVeloxLinkButton.textContent =
           "Linking...";
 
         try {
-          await submitManualVeloxLink(
-            veloxId,
-            caseId
-          );
+
+          for (
+            const veloxId
+            of selectedVeloxIds
+          ) {
+
+            await submitManualVeloxLink(
+              veloxId,
+              caseId
+            );
+          }
 
           showToast(
-            "Operi call linked successfully."
+            `${selectedVeloxIds.length} Velox transcript${selectedVeloxIds.length === 1
+              ? ""
+              : "s"
+            } linked successfully.`
           );
 
           const selectedCase =
             state.cases.find(
-              (item) =>
+              item =>
                 item.id === caseId
             );
 
@@ -5502,21 +5820,23 @@ function bindEvents() {
               selectedCase
             );
           }
+
         } catch (error) {
+
           console.error(
             "Manual Velox link failed:",
             error
           );
 
           showToast(
-            "Unable to link this Operi call."
+            "Unable to link one or more Velox transcripts."
           );
 
           caseVeloxLinkButton.disabled =
             false;
 
           caseVeloxLinkButton.textContent =
-            "Link Velox Call";
+            "Link Selected Velox Calls";
         }
 
         return;
@@ -5533,14 +5853,21 @@ function bindEvents() {
             "veloxManualCaseSelect"
           );
 
-        const caseId =
-          String(
-            select?.value || ""
-          ).trim();
+        const selectedCaseIds =
+          Array.from(
+            select?.selectedOptions || []
+          )
+            .map(
+              option =>
+                String(
+                  option.value || ""
+                ).trim()
+            )
+            .filter(Boolean);
 
-        if (!caseId) {
+        if (!selectedCaseIds.length) {
           showToast(
-            "Select a Zoho Case first."
+            "Select at least one Zoho Case."
           );
 
           return;
@@ -5556,11 +5883,14 @@ function bindEvents() {
 
           await submitManualVeloxLink(
             veloxId,
-            caseId
+            selectedCaseIds
           );
 
           showToast(
-            "Transcript linked successfully."
+            `${selectedCaseIds.length} Zoho Case${selectedCaseIds.length === 1
+              ? ""
+              : "s"
+            } linked successfully.`
           );
 
           const refreshedTranscript =
@@ -5588,7 +5918,87 @@ function bindEvents() {
             false;
 
           manualLinkButton.textContent =
-            "Link to Zoho Case";
+            "Link Selected Zoho Cases";
+        }
+
+        return;
+      }
+
+      const veloxUnlinkTicketButton =
+        event.target.closest(
+          ".velox-unlink-ticket-button"
+        );
+
+      if (veloxUnlinkTicketButton) {
+
+        const veloxId =
+          String(
+            veloxUnlinkTicketButton
+              .dataset.veloxId || ""
+          ).trim();
+
+        const zohoTicketId =
+          String(
+            veloxUnlinkTicketButton
+              .dataset.zohoTicketId || ""
+          ).trim();
+
+        if (
+          !veloxId ||
+          !zohoTicketId
+        ) {
+          showToast(
+            "Unable to identify the link."
+          );
+
+          return;
+        }
+
+        veloxUnlinkTicketButton.disabled =
+          true;
+
+        veloxUnlinkTicketButton.textContent =
+          "Unlinking...";
+
+        try {
+
+          await submitManualVeloxTicketUnlink(
+            veloxId,
+            zohoTicketId
+          );
+
+          showToast(
+            "Zoho case unlinked successfully."
+          );
+
+          const refreshedTranscript =
+            state.veloxTranscripts.find(
+              (item) =>
+                item.id === veloxId
+            );
+
+          if (refreshedTranscript) {
+            renderVeloxDetail(
+              refreshedTranscript
+            );
+          }
+
+        } catch (error) {
+
+          console.error(
+            "Manual Zoho ticket unlink failed:",
+            error
+          );
+
+          showToast(
+            "Unable to unlink this Zoho case."
+          );
+
+          veloxUnlinkTicketButton.disabled =
+            false;
+
+          veloxUnlinkTicketButton.textContent =
+            "Unlink";
         }
 
         return;
@@ -5650,10 +6060,34 @@ function bindEvents() {
 
       const caseVeloxUnlinkButton =
         event.target.closest(
-          ".velox-unlink-case-button"
+          ".case-velox-unlink-button"
         );
 
       if (caseVeloxUnlinkButton) {
+
+        const veloxId =
+          String(
+            caseVeloxUnlinkButton
+              .dataset.veloxId || ""
+          ).trim();
+
+        const zohoTicketId =
+          String(
+            caseVeloxUnlinkButton
+              .dataset.zohoTicketId || ""
+          ).trim();
+
+        if (
+          !veloxId ||
+          !zohoTicketId
+        ) {
+          showToast(
+            "Unable to identify the Velox link."
+          );
+
+          return;
+        }
+
         caseVeloxUnlinkButton.disabled =
           true;
 
@@ -5661,17 +6095,19 @@ function bindEvents() {
           "Unlinking...";
 
         try {
-          await submitManualVeloxUnlink(
-            caseVeloxUnlinkButton.dataset.veloxId
+
+          await submitManualVeloxTicketUnlink(
+            veloxId,
+            zohoTicketId
           );
 
           showToast(
-            "Operi call unlinked successfully."
+            "Velox call unlinked successfully."
           );
 
           const selectedCase =
             state.cases.find(
-              (item) =>
+              item =>
                 item.id ===
                 state.selectedCaseId
             );
@@ -5681,21 +6117,23 @@ function bindEvents() {
               selectedCase
             );
           }
+
         } catch (error) {
+
           console.error(
-            "Manual Velox unlink failed:",
+            "Manual Velox case unlink failed:",
             error
           );
 
           showToast(
-            "Unable to unlink this Operi call."
+            "Unable to unlink this Velox call."
           );
 
           caseVeloxUnlinkButton.disabled =
             false;
 
           caseVeloxUnlinkButton.textContent =
-            "Unlink Velox Call";
+            "Unlink";
         }
 
         return;

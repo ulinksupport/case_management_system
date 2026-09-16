@@ -1501,19 +1501,82 @@ tr[data-velox-id] .secondary-text {
   font-weight: 800;
 }
 
+.velox-case-select-label {
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 9px;
+  font-weight: 700;
+}
+
 .velox-manual-link select {
   width: 100%;
   min-width: 0;
-  height: 35px;
-  padding: 0 8px;
+  height: auto;
+  min-height: 120px;
+  max-height: 160px;
+  padding: 5px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: #fff;
+  color: var(--text);
   font-size: 9px;
+  line-height: 1.5;
+}
+
+.velox-manual-link select option {
+  padding: 6px 7px;
+}
+
+.velox-case-select-help {
+  margin-top: -3px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
 }
 
 .velox-manual-link button {
   width: 100%;
+}
+
+.linked-velox-case-section {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+}
+
+.linked-velox-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.linked-velox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.linked-velox-info {
+  min-width: 0;
+}
+
+.linked-velox-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 9px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linked-velox-meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 8px;
 }
 
 .ai-summary-timeline {
@@ -1630,6 +1693,77 @@ tr[data-velox-id] .secondary-text {
   border-top-color: var(--brand);
   border-radius: 50%;
   animation: aiCaseReportSpin 0.8s linear infinite;
+}
+
+.multi-case-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.multi-case-dropdown-toggle {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.multi-case-dropdown-toggle:hover {
+  border-color: var(--brand);
+}
+
+.multi-case-dropdown-arrow {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.multi-case-dropdown-menu {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  top: calc(100% + 5px);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.multi-case-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.multi-case-option:hover {
+  background: var(--surface-soft);
+}
+
+.multi-case-option input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.multi-case-option span {
+  flex: 1;
 }
 
 @keyframes aiCaseReportSpin {
@@ -1813,6 +1947,15 @@ tr[data-velox-id] .secondary-text {
   opacity: 0.6;
 }
 
+.chronology-source {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+  font-weight: 600;
+}
 
 
 @media (max-width: 800px) {
