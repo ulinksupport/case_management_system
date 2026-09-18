@@ -2575,19 +2575,17 @@ function renderVeloxDetail(
   state.selectedVeloxId =
     transcript.id;
 
+  const linkedZohoTickets =
+    Array.isArray(
+      transcript.linkedZohoTickets
+    )
+      ? transcript.linkedZohoTickets
+        .map(id => String(id ?? "").trim())
+        .filter(Boolean)
+      : [];
+
   const isLinked =
-    Boolean(
-      String(
-        transcript.linkedMasterCase ??
-        ""
-      ).trim()
-    ) ||
-    Boolean(
-      String(
-        transcript.linkedZohoTicket ??
-        ""
-      ).trim()
-    );
+    linkedZohoTickets.length > 0;
 
   elements.veloxHero.innerHTML = `
     <div class="hero-top">
@@ -2642,7 +2640,7 @@ function renderVeloxDetail(
       : "grey"
     }">
             ${isLinked
-      ? "Linked"
+      ? `Linked · ${linkedZohoTickets.length} Zoho Case${linkedZohoTickets.length === 1 ? "" : "s"}`
       : "Not linked"
     }
           </span>
