@@ -1303,6 +1303,68 @@ tbody tr:last-child td {
   background: #f8fdff;
 }
 
+.ops-review-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #edf1f5;
+}
+
+.ops-review-help {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.ops-review-textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  resize: vertical;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.ops-review-textarea:focus {
+  border-color: #9fd3df;
+  outline: 3px solid rgba(18, 111, 146, 0.12);
+}
+
+.ops-review-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.ops-review-button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.ops-review-button:hover {
+  background: var(--brand-dark);
+}
+
+.ops-review-button.secondary {
+  color: var(--brand);
+  background: #fff;
+}
+
+.ops-review-button.secondary:hover {
+  background: var(--brand-soft);
+}
+
 .record-list {
   padding: 6px 14px 13px;
 }

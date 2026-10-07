@@ -3751,10 +3751,52 @@ function renderCaseDetail(caseItem) {
       <div class="ai-copy emphasis">${escapeHtml(caseItem.ai.nextStep)}</div>
     </div>
     <div class="ai-section">
-      <div class="ai-label">Suggested reply</div>
-      <div class="ai-copy suggested-reply">${escapeHtml(caseItem.ai.suggestedReply)}</div>
+    <div class="ai-label">Suggested reply</div>
+      <div class="ai-copy suggested-reply">
+        ${escapeHtml(caseItem.ai.suggestedReply)}
+      </div>
     </div>
-  `;
+
+    <div class="ops-review-section">
+
+      <div class="ai-label">
+        Ops Review
+      </div>
+
+      <div class="ops-review-help">
+        Review the AI suggestion and record any correction,
+        improvement or guidance that should be remembered.
+      </div>
+
+      <textarea
+        class="ops-review-textarea"
+        id="opsReviewInput"
+        placeholder="Enter Ops review..."
+        rows="5"
+      ></textarea>
+
+      <div class="ops-review-actions">
+
+        <button
+          type="button"
+          class="ops-review-button"
+          id="saveKnowledgeBaseButton"
+        >
+          Save to Knowledge Base
+        </button>
+
+        <button
+          type="button"
+          class="ops-review-button secondary"
+          id="saveCaseKnowledgeBaseButton"
+        >
+          Save to Case-specific Knowledge Base
+        </button>
+
+      </div>
+
+    </div>
+    `;
 
   const recordRows = [
     ["Master Case ID", caseItem.id],
@@ -6624,6 +6666,47 @@ function bindEvents() {
         state.activeTimelineChannel = segment.dataset.channel;
         const selectedCase = state.cases.find((item) => item.id === state.selectedCaseId);
         if (selectedCase) renderTimeline(selectedCase);
+      }
+
+      const saveKnowledgeBaseButton =
+        event.target.closest(
+          "#saveKnowledgeBaseButton"
+        );
+
+      const saveCaseKnowledgeBaseButton =
+        event.target.closest(
+          "#saveCaseKnowledgeBaseButton"
+        );
+
+      if (
+        saveKnowledgeBaseButton ||
+        saveCaseKnowledgeBaseButton
+      ) {
+        const review =
+          document
+            .getElementById("opsReviewInput")
+            ?.value
+            .trim() || "";
+
+        if (!review) {
+          showToast(
+            "Please enter an Ops review first."
+          );
+
+          return;
+        }
+
+        if (saveKnowledgeBaseButton) {
+          showToast(
+            "Save to Knowledge Base will be connected to the backend later."
+          );
+        } else {
+          showToast(
+            "Save to Case-specific Knowledge Base will be connected to the backend later."
+          );
+        }
+
+        return;
       }
 
       const aiRegenerateButton =
