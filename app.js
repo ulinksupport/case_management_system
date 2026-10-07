@@ -1797,18 +1797,6 @@ function renderDataSourceStatus() {
   elements.environmentBadge.textContent = isLive
     ? "Live Zoho Data"
     : "Dummy Data";
-
-  elements.dataSourceNotice.classList.toggle(
-    "warning-notice",
-    !isLive
-  );
-
-  elements.dataSourceIcon.textContent = isLive ? "✓" : "!";
-  elements.dataSourceBadge.textContent = isLive
-    ? "LIVE DATA"
-    : "DUMMY DATA";
-
-  elements.dataSourceMessage.textContent = ` ${state.dataMessage}`;
 }
 
 function renderKpis() {
