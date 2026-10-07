@@ -1489,10 +1489,16 @@ const dataRepository = {
 
 const state = {
   cases: [],
+  casePage: 1,
+  casePageSize: 10,
+
   unmatched: [],
   ingestion: [],
 
   veloxTranscripts: [],
+  veloxPage: 1,
+  veloxPageSize: 10,
+
   selectedVeloxId: null,
 
   relationshipFilter: "all",
@@ -1543,6 +1549,17 @@ const elements = {
   matchFilter: document.getElementById("matchFilter"),
   caseCount: document.getElementById("caseCount"),
   caseTableBody: document.getElementById("caseTableBody"),
+  casePrevPage:
+    document.getElementById("casePrevPage"),
+
+  caseNextPage:
+    document.getElementById("caseNextPage"),
+
+  casePageInfo:
+    document.getElementById("casePageInfo"),
+
+  casePageSize:
+    document.getElementById("casePageSize"),
   unmatchedTableBody: document.getElementById("unmatchedTableBody"),
   unmatchedSummary: document.getElementById("unmatchedSummary"),
   ingestionTableBody: document.getElementById("ingestionTableBody"),
@@ -1571,6 +1588,17 @@ const elements = {
   veloxSearch: document.getElementById("veloxSearch"),
   veloxCount: document.getElementById("veloxCount"),
   veloxTableBody: document.getElementById("veloxTableBody"),
+  veloxPrevPage:
+    document.getElementById("veloxPrevPage"),
+
+  veloxNextPage:
+    document.getElementById("veloxNextPage"),
+
+  veloxPageInfo:
+    document.getElementById("veloxPageInfo"),
+
+  veloxPageSize:
+    document.getElementById("veloxPageSize"),
   veloxBackButton: document.getElementById("veloxBackButton"),
   veloxHero: document.getElementById("veloxHero"),
   veloxTranscriptContent: document.getElementById("veloxTranscriptContent"),
@@ -1933,13 +1961,53 @@ function renderCaseTable() {
 
   elements.caseCount.textContent = filtered.length;
 
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filtered.length /
+        state.casePageSize
+      )
+    );
+
+  if (state.casePage > totalPages) {
+    state.casePage = totalPages;
+  }
+
+  if (state.casePage < 1) {
+    state.casePage = 1;
+  }
+
+  const startIndex =
+    (state.casePage - 1) *
+    state.casePageSize;
+
+  const endIndex =
+    startIndex +
+    state.casePageSize;
+
+  const pagedCases =
+    filtered.slice(
+      startIndex,
+      endIndex
+    );
+
+  elements.casePageInfo.textContent =
+    `Page ${state.casePage} of ${totalPages}`;
+
+  elements.casePrevPage.disabled =
+    state.casePage <= 1;
+
+  elements.caseNextPage.disabled =
+    state.casePage >= totalPages;
+
   if (!filtered.length) {
     elements.caseTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No cases match the current filters.</div></td></tr>`;
     return;
   }
 
   elements.caseTableBody.innerHTML =
-    filtered.map((item) => {
+    pagedCases.map((item) => {
       const caseZohoTicketId =
         String(
           item.zohoTicketId || ""
@@ -2116,6 +2184,46 @@ function renderVeloxTable() {
   elements.veloxCount.textContent =
     filtered.length;
 
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filtered.length /
+        state.veloxPageSize
+      )
+    );
+
+  if (state.veloxPage > totalPages) {
+    state.veloxPage = totalPages;
+  }
+
+  if (state.veloxPage < 1) {
+    state.veloxPage = 1;
+  }
+
+  const startIndex =
+    (state.veloxPage - 1) *
+    state.veloxPageSize;
+
+  const endIndex =
+    startIndex +
+    state.veloxPageSize;
+
+  const pagedVelox =
+    filtered.slice(
+      startIndex,
+      endIndex
+    );
+
+  elements.veloxPageInfo.textContent =
+    `Page ${state.veloxPage} of ${totalPages}`;
+
+  elements.veloxPrevPage.disabled =
+    state.veloxPage <= 1;
+
+  elements.veloxNextPage.disabled =
+    state.veloxPage >= totalPages;
+
   if (!filtered.length) {
     elements.veloxTableBody.innerHTML = `
       <tr>
@@ -2131,7 +2239,7 @@ function renderVeloxTable() {
   }
 
   elements.veloxTableBody.innerHTML =
-    filtered
+    pagedVelox
       .map((item) => {
         const contact = [
           String(item.phone ?? "").trim(),
@@ -5581,12 +5689,99 @@ function bindEvents() {
   elements.veloxSearch
     .addEventListener(
       "input",
-      renderVeloxTable
+      () => {
+        state.veloxPage = 1;
+        renderVeloxTable();
+      }
     );
 
-  elements.caseSearch.addEventListener("input", renderCaseTable);
-  elements.caseTypeFilter.addEventListener("change", renderCaseTable);
-  elements.matchFilter.addEventListener("change", renderCaseTable);
+  elements.veloxPrevPage.addEventListener(
+    "click",
+    () => {
+      if (state.veloxPage > 1) {
+        state.veloxPage -= 1;
+        renderVeloxTable();
+      }
+    }
+  );
+
+  elements.veloxNextPage.addEventListener(
+    "click",
+    () => {
+      state.veloxPage += 1;
+      renderVeloxTable();
+    }
+  );
+
+  elements.veloxPageSize.addEventListener(
+    "change",
+    () => {
+      state.veloxPageSize =
+        Number(
+          elements.veloxPageSize.value
+        ) || 10;
+
+      state.veloxPage = 1;
+
+      renderVeloxTable();
+    }
+  );
+
+  elements.caseSearch.addEventListener(
+    "input",
+    () => {
+      state.casePage = 1;
+      renderCaseTable();
+    }
+  );
+
+  elements.caseTypeFilter.addEventListener(
+    "change",
+    () => {
+      state.casePage = 1;
+      renderCaseTable();
+    }
+  );
+
+  elements.matchFilter.addEventListener(
+    "change",
+    () => {
+      state.casePage = 1;
+      renderCaseTable();
+    }
+  );
+
+  elements.casePrevPage.addEventListener(
+    "click",
+    () => {
+      if (state.casePage > 1) {
+        state.casePage -= 1;
+        renderCaseTable();
+      }
+    }
+  );
+
+  elements.caseNextPage.addEventListener(
+    "click",
+    () => {
+      state.casePage += 1;
+      renderCaseTable();
+    }
+  );
+
+  elements.casePageSize.addEventListener(
+    "change",
+    () => {
+      state.casePageSize =
+        Number(
+          elements.casePageSize.value
+        ) || 10;
+
+      state.casePage = 1;
+
+      renderCaseTable();
+    }
+  );
 
   elements.globalSearch.addEventListener("keydown", (event) => {
     if (event.key === "Enter") handleGlobalSearch();
@@ -6529,6 +6724,8 @@ document
 
         state.relationshipFilter =
           button.dataset.type;
+
+        state.casePage = 1;
 
         renderCaseTable();
       }

@@ -681,6 +681,57 @@ h1 {
   font-size: 9px;
 }
 
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 15px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+
+.pagination-button {
+  min-width: 34px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.pagination-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-page-info {
+  min-width: 82px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pagination-page-size {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 9px;
+}
+
 .table-wrap {
   width: 100%;
   max-width: 100%;
