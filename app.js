@@ -4380,10 +4380,148 @@ function renderMasterChronology(caseItem) {
       })
       .join("");
 
-  const outstanding =
-    Array.isArray(cached.outstanding)
-      ? cached.outstanding
+  const caseOverview =
+    cached.caseOverview &&
+      typeof cached.caseOverview === "object"
+      ? cached.caseOverview
+      : {};
+
+  const assistanceInvolved =
+    Array.isArray(
+      caseOverview.assistanceInvolved
+    )
+      ? caseOverview.assistanceInvolved
       : [];
+
+  const caseOverviewHtml = `
+  <div class="chronology-overview-grid">
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        Client
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview.clientName ||
+    "Not available"
+  )}
+      </div>
+    </div>
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        First Contact Date
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview.firstContactDate ||
+    "Not available"
+  )}
+      </div>
+    </div>
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        First Contact From
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview.firstContactFrom ||
+    "Not confirmed"
+  )}
+      </div>
+    </div>
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        Patient / Member
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview.patientMember ||
+    "Not available"
+  )}
+      </div>
+    </div>
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        Location
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview.location ||
+    "Not available"
+  )}
+      </div>
+    </div>
+
+    <div class="chronology-overview-item">
+      <div class="chronology-overview-label">
+        Admission / Incident / Appointment
+      </div>
+      <div class="chronology-overview-value">
+        ${escapeHtml(
+    caseOverview
+      .admissionIncidentOrAppointmentDate ||
+    "Not available"
+  )}
+      </div>
+    </div>
+
+  </div>
+
+  <div class="chronology-overview-block">
+    <div class="chronology-overview-label">
+      Assistance Involved
+    </div>
+
+    ${assistanceInvolved.length
+      ? `
+          <ul class="chronology-overview-list">
+            ${assistanceInvolved
+        .map(
+          item => `
+                  <li>
+                    ${escapeHtml(item)}
+                  </li>
+                `
+        )
+        .join("")}
+          </ul>
+        `
+      : `
+          <div class="chronology-overview-value">
+            Not available
+          </div>
+        `
+    }
+  </div>
+
+  <div class="chronology-overview-block">
+    <div class="chronology-overview-label">
+      Case Summary
+    </div>
+    <div class="chronology-overview-value">
+      ${escapeHtml(
+      caseOverview.caseSummary ||
+      "Not available"
+    )}
+    </div>
+  </div>
+
+  <div class="chronology-overview-block">
+    <div class="chronology-overview-label">
+      Current Situation
+    </div>
+    <div class="chronology-overview-value">
+      ${escapeHtml(
+      caseOverview.currentSituation ||
+      "Not available"
+    )}
+    </div>
+  </div>
+`;
 
   elements.timelineContainer.innerHTML = `
     <div class="master-chronology">
@@ -4394,54 +4532,9 @@ function renderMasterChronology(caseItem) {
         </div>
 
         <div class="chronology-summary-copy">
-          ${escapeHtml(
-    cached.caseOverview || ""
-  )}
+          ${caseOverviewHtml}
         </div>
       </section>
-
-      <div class="chronology-status-grid">
-
-        <section class="chronology-status-box current">
-          <div class="chronology-section-label">
-            CURRENT POSITION
-          </div>
-
-          <div class="chronology-summary-copy">
-            ${escapeHtml(
-    cached.currentPosition || ""
-  )}
-          </div>
-        </section>
-
-        <section class="chronology-status-box outstanding">
-          <div class="chronology-section-label">
-            OUTSTANDING
-          </div>
-
-          ${outstanding.length
-      ? `
-                <ul class="chronology-outstanding-list">
-                  ${outstanding
-        .map(
-          item => `
-                        <li>
-                          ${escapeHtml(item)}
-                        </li>
-                      `
-        )
-        .join("")}
-                </ul>
-              `
-      : `
-                <div class="chronology-summary-copy">
-                  No clearly identified outstanding items.
-                </div>
-              `
-    }
-        </section>
-
-      </div>
 
       <div class="chronology-heading">
         CASE CHRONOLOGY
@@ -5185,21 +5278,15 @@ async function generateAiMasterChronology(
 
         generatedAt:
           result.generatedAt || "",
+
         caseOverview:
-          result.caseOverview || "",
+          result.caseOverview || {},
+
         chronology:
           Array.isArray(
             result.chronology
           )
             ? result.chronology
-            : [],
-        currentPosition:
-          result.currentPosition || "",
-        outstanding:
-          Array.isArray(
-            result.outstanding
-          )
-            ? result.outstanding
             : []
       }
     );
