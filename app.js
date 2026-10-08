@@ -5622,18 +5622,59 @@ function openLinkedTicketInNewTab(ticketId) {
     String(ticketId ?? "").trim();
 
   if (!normalizedTicketId) {
+    showToast(
+      "Unable to identify the linked Zoho case."
+    );
     return;
   }
 
   const url =
     `${window.location.origin}${window.location.pathname}` +
-    `?openTicket=${encodeURIComponent(normalizedTicketId)}`;
+    `?openTicket=${encodeURIComponent(
+      normalizedTicketId
+    )}`;
 
-  window.open(
-    url,
-    "_blank",
-    "noopener,noreferrer"
-  );
+  const openedWindow =
+    window.open(
+      url,
+      "_blank"
+    );
+
+  if (openedWindow) {
+    openedWindow.opener = null;
+  } else {
+    window.location.href = url;
+  }
+}
+
+function openZohoTicketInNewTab(ticketId) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (!normalizedTicketId) {
+    showToast(
+      "Unable to identify the Zoho ticket."
+    );
+    return;
+  }
+
+  const url =
+    `https://desk.zoho.com/support/ulink/ShowHomePage.do` +
+    `#Cases/dv/${encodeURIComponent(
+      normalizedTicketId
+    )}`;
+
+  const openedWindow =
+    window.open(
+      url,
+      "_blank"
+    );
+
+  if (openedWindow) {
+    openedWindow.opener = null;
+  } else {
+    window.location.href = url;
+  }
 }
 
 function openZohoTicketInNewTab(ticketId) {
