@@ -1303,6 +1303,77 @@ tbody tr:last-child td {
   background: #f8fdff;
 }
 
+.ai-guidance-status {
+  padding: 18px 14px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.ai-guidance-status strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+  font-size: 10px;
+}
+
+.ai-guidance-status.error {
+  color: var(--danger);
+}
+
+.ai-guidance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-guidance-item {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+
+.ai-guidance-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+}
+
+.ai-guidance-action {
+  margin-top: 7px;
+  color: #374355;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.ai-guidance-urgent {
+  margin-top: 7px;
+  color: var(--danger);
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.ai-guidance-reply {
+  margin-bottom: 0;
+}
+
+.ai-guidance-instruction {
+  margin: 7px 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.ai-guidance-meta {
+  padding: 0 14px 13px;
+  color: var(--muted);
+  font-size: 8px;
+  text-align: right;
+}
+
 .ops-review-section {
   margin-top: 14px;
   padding-top: 14px;

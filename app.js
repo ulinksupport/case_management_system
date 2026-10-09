@@ -23,6 +23,9 @@ const appConfig = {
     aiCaseReport:
       "/webhook/ai-case-report",
 
+    aiCaseGuidance:
+      "/webhook/cms-ai-guidance",
+
     aiMasterChronology:
       "/webhook/ai-master-chronology",
 
@@ -1516,7 +1519,15 @@ const state = {
   detailCache: new Map(),
   detailRequestSequence: 0,
 
+  aiCaseGuidance: new Map(),
+  aiCaseGuidanceRequestSequence: 0,
+
   aiCaseReports: new Map(),
+  aiCaseReportRequestSequence: 0,
+
+  aiMasterChronologies: new Map(),
+  aiMasterChronologyRequestSequence: 0,
+
   aiCaseReportRequestSequence: 0,
 
   aiMasterChronologies: new Map(),
@@ -3733,70 +3744,9 @@ function renderCaseDetail(caseItem) {
         </tr>
       `;
 
-  elements.aiPanel.innerHTML = `
-    <div class="ai-section">
-      <div class="ai-label">Case summary</div>
-      <div class="ai-copy">${escapeHtml(caseItem.ai.summary)}</div>
-    </div>
-    <div class="ai-section">
-      <div class="ai-label">Latest update</div>
-      <div class="ai-copy emphasis">${escapeHtml(caseItem.ai.latestUpdate)}</div>
-    </div>
-    <div class="ai-section">
-      <div class="ai-label">Pending items</div>
-      <ul class="pending-list">${caseItem.ai.pendingItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-    </div>
-    <div class="ai-section">
-      <div class="ai-label">Suggested next step</div>
-      <div class="ai-copy emphasis">${escapeHtml(caseItem.ai.nextStep)}</div>
-    </div>
-    <div class="ai-section">
-    <div class="ai-label">Suggested reply</div>
-      <div class="ai-copy suggested-reply">
-        ${escapeHtml(caseItem.ai.suggestedReply)}
-      </div>
-    </div>
-
-    <div class="ops-review-section">
-
-      <div class="ai-label">
-        Ops Review
-      </div>
-
-      <div class="ops-review-help">
-        Review the AI suggestion and record any correction,
-        improvement or guidance that should be remembered.
-      </div>
-
-      <textarea
-        class="ops-review-textarea"
-        id="opsReviewInput"
-        placeholder="Enter Ops review..."
-        rows="5"
-      ></textarea>
-
-      <div class="ops-review-actions">
-
-        <button
-          type="button"
-          class="ops-review-button"
-          id="saveKnowledgeBaseButton"
-        >
-          Save to Knowledge Base
-        </button>
-
-        <button
-          type="button"
-          class="ops-review-button secondary"
-          id="saveCaseKnowledgeBaseButton"
-        >
-          Save to Case-specific Knowledge Base
-        </button>
-
-      </div>
-
-    </div>
-    `;
+  renderAiCaseGuidance(
+    caseItem
+  );
 
   const recordRows = [
     ["Master Case ID", caseItem.id],
@@ -5454,6 +5404,665 @@ async function refreshOpenCaseFromDatabase() {
   }
 }
 
+function parseGuidanceJsonArray(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return [];
+  }
+
+  try {
+    const parsed =
+      JSON.parse(String(value));
+
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+
+function formatGuidanceClassification(value) {
+  const labels = {
+    ulink_action_required:
+      "Ulink action required",
+
+    awaiting_external_party:
+      "Awaiting external party",
+
+    ops_confirmation_required:
+      "Ops confirmation required",
+
+    follow_up_delayed:
+      "Follow-up delayed",
+
+    information_only:
+      "Information only"
+  };
+
+  const normalized =
+    String(value || "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    labels[normalized] ||
+    normalized ||
+    "Action"
+  );
+}
+
+
+async function fetchAiCaseGuidance(ticketId) {
+  const normalizedTicketId =
+    String(ticketId ?? "").trim();
+
+  if (
+    !/^\d{10,30}$/.test(
+      normalizedTicketId
+    )
+  ) {
+    throw new Error(
+      "A valid internal Zoho ticket ID is required."
+    );
+  }
+
+  const controller =
+    new AbortController();
+
+  const timeout =
+    setTimeout(
+      () => controller.abort(),
+      120000
+    );
+
+  try {
+    const response =
+      await fetch(
+        buildApiUrl(
+          appConfig.endpoints
+            .aiCaseGuidance
+        ),
+        {
+          method: "POST",
+
+          headers: {
+            Accept:
+              "application/json",
+
+            "Content-Type":
+              "application/json"
+          },
+
+          cache: "no-store",
+
+          signal:
+            controller.signal,
+
+          body:
+            JSON.stringify({
+              ticketId:
+                normalizedTicketId
+            })
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `AI Guidance returned HTTP ${response.status}`
+      );
+    }
+
+    const payload =
+      await response.json();
+
+    const root =
+      Array.isArray(payload)
+        ? payload[0]
+        : payload;
+
+    if (!root) {
+      throw new Error(
+        "AI Guidance returned an empty response."
+      );
+    }
+
+    if (root.success === false) {
+      throw new Error(
+        root.message ||
+        "AI Guidance request failed."
+      );
+    }
+
+    /*
+      Supports both:
+      - normalized cached/generated response
+      - direct Save AI Suggestion row
+    */
+    return {
+      status:
+        String(
+          root.status || "ready"
+        ).trim(),
+
+      source:
+        String(
+          root.source || "generated"
+        ).trim(),
+
+      generated:
+        Boolean(root.generated),
+
+      suggestionKey:
+        String(
+          root.suggestionKey || ""
+        ).trim(),
+
+      caseIdentifier:
+        String(
+          root.caseIdentifier || ""
+        ).trim(),
+
+      sourceFingerprint:
+        String(
+          root.sourceFingerprint || ""
+        ).trim(),
+
+      latestUpdate:
+        String(
+          root.latestUpdate || ""
+        ).trim(),
+
+      nextSteps:
+        parseGuidanceJsonArray(
+          root.nextStepsJson
+        ),
+
+      suggestedReplies:
+        parseGuidanceJsonArray(
+          root.suggestedRepliesJson
+        ),
+
+      requiresOpsConfirmation:
+        parseGuidanceJsonArray(
+          root.requiresOpsConfirmationJson
+        )
+          .map(
+            item =>
+              String(item || "").trim()
+          )
+          .filter(Boolean),
+
+      generatedAt:
+        String(
+          root.generatedAt || ""
+        ).trim(),
+
+      model:
+        String(
+          root.model || ""
+        ).trim()
+    };
+
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
+function renderAiCaseGuidance(caseItem) {
+  const ticketId =
+    String(
+      caseItem?.zohoTicketId || ""
+    ).trim();
+
+  if (!ticketId) {
+    elements.aiPanel.innerHTML = `
+      <div class="empty-state">
+        AI Guidance is not available because
+        this case has no Zoho ticket ID.
+      </div>
+    `;
+
+    return;
+  }
+
+  const guidance =
+    state.aiCaseGuidance.get(
+      ticketId
+    );
+
+
+  if (!guidance) {
+    elements.aiPanel.innerHTML = `
+      <div class="ai-guidance-status">
+        AI Guidance will load automatically
+        when this case is opened.
+      </div>
+    `;
+
+    return;
+  }
+
+
+  if (
+    guidance.status === "loading"
+  ) {
+    elements.aiPanel.innerHTML = `
+      <div class="ai-guidance-status">
+        <strong>
+          Checking current AI Guidance…
+        </strong>
+
+        <div>
+          Looking for saved guidance and
+          checking whether the case has changed.
+        </div>
+      </div>
+    `;
+
+    return;
+  }
+
+
+  if (
+    guidance.status === "error"
+  ) {
+    elements.aiPanel.innerHTML = `
+      <div class="ai-guidance-status error">
+        <strong>
+          Unable to load AI Guidance.
+        </strong>
+
+        <div>
+          ${escapeHtml(
+      guidance.message ||
+      "Please reopen the case and try again."
+    )}
+        </div>
+      </div>
+    `;
+
+    return;
+  }
+
+
+  const nextSteps =
+    Array.isArray(
+      guidance.nextSteps
+    )
+      ? guidance.nextSteps
+      : [];
+
+  const suggestedReplies =
+    Array.isArray(
+      guidance.suggestedReplies
+    )
+      ? guidance.suggestedReplies
+      : [];
+
+  const confirmations =
+    Array.isArray(
+      guidance.requiresOpsConfirmation
+    )
+      ? guidance.requiresOpsConfirmation
+      : [];
+
+
+  const nextStepsHtml =
+    nextSteps.length
+      ? nextSteps
+        .map(step => `
+          <div class="ai-guidance-item">
+
+            <div class="ai-guidance-item-head">
+
+              <strong>
+                ${escapeHtml(
+          step.party ||
+          "Relevant party"
+        )}
+              </strong>
+
+              <span class="pill ${step.urgent
+            ? "red"
+            : "blue"
+          }">
+                ${escapeHtml(
+            formatGuidanceClassification(
+              step.classification
+            )
+          )}
+              </span>
+
+            </div>
+
+            <div class="ai-guidance-action">
+              ${escapeHtml(
+            step.action || ""
+          )}
+            </div>
+
+            ${step.urgent &&
+            step.urgencyNote
+            ? `
+                  <div class="ai-guidance-urgent">
+                    ${escapeHtml(
+              step.urgencyNote
+            )}
+                  </div>
+                `
+            : ""
+          }
+
+          </div>
+        `)
+        .join("")
+      : `
+        <div class="ai-copy">
+          No additional next step was identified.
+        </div>
+      `;
+
+
+  const confirmationsHtml =
+    confirmations.length
+      ? `
+        <div class="ai-section">
+
+          <div class="ai-label">
+            Ops Confirmation Required
+          </div>
+
+          <ul class="pending-list">
+            ${confirmations
+        .map(
+          item => `
+                  <li>
+                    ${escapeHtml(item)}
+                  </li>
+                `
+        )
+        .join("")}
+          </ul>
+
+        </div>
+      `
+      : "";
+
+
+  const repliesHtml =
+    suggestedReplies.length
+      ? suggestedReplies
+        .map(reply => `
+          <div class="suggested-reply ai-guidance-reply">
+
+            <div class="ai-guidance-item-head">
+              <strong>
+                ${escapeHtml(
+          reply.party ||
+          "Relevant party"
+        )}
+              </strong>
+            </div>
+
+            ${reply.instruction
+            ? `
+                  <div class="ai-guidance-instruction">
+                    ${escapeHtml(
+              reply.instruction
+            )}
+                  </div>
+                `
+            : ""
+          }
+
+            <div class="ai-copy">
+              ${escapeHtml(
+            reply.draft || ""
+          )}
+            </div>
+
+          </div>
+        `)
+        .join("")
+      : `
+        <div class="ai-copy">
+          No suggested reply is currently required.
+        </div>
+      `;
+
+
+  const generatedAt =
+    guidance.generatedAt
+      ? formatTicketDate(
+        guidance.generatedAt
+      )
+      : "";
+
+  const sourceLabel =
+    guidance.source === "cache"
+      ? "Saved guidance"
+      : guidance.source === "regenerated"
+        ? "Regenerated guidance"
+        : "Generated guidance";
+
+
+  elements.aiPanel.innerHTML = `
+
+    <div class="ai-section">
+      <div class="ai-label">
+        Latest Update
+      </div>
+
+      <div class="ai-copy emphasis">
+        ${escapeHtml(
+    guidance.latestUpdate ||
+    "No latest update was returned."
+  )}
+      </div>
+    </div>
+
+
+    <div class="ai-section">
+      <div class="ai-label">
+        Suggested Next Steps
+      </div>
+
+      <div class="ai-guidance-list">
+        ${nextStepsHtml}
+      </div>
+    </div>
+
+
+    ${confirmationsHtml}
+
+
+    <div class="ai-section">
+      <div class="ai-label">
+        Suggested Replies
+      </div>
+
+      <div class="ai-guidance-list">
+        ${repliesHtml}
+      </div>
+    </div>
+
+
+    <div class="ai-guidance-meta">
+      ${escapeHtml(sourceLabel)}
+      ${generatedAt
+      ? ` · ${escapeHtml(
+        generatedAt
+      )}`
+      : ""
+    }
+    </div>
+
+
+    <div class="ops-review-section">
+
+      <div class="ai-label">
+        Ops Review
+      </div>
+
+      <div class="ops-review-help">
+        Review the AI suggestion and record any correction,
+        improvement or guidance that should be remembered.
+      </div>
+
+      <textarea
+        class="ops-review-textarea"
+        id="opsReviewInput"
+        placeholder="Enter Ops review..."
+        rows="5"
+      ></textarea>
+
+      <div class="ops-review-actions">
+
+        <button
+          type="button"
+          class="ops-review-button"
+          id="saveKnowledgeBaseButton"
+        >
+          Save to Knowledge Base
+        </button>
+
+        <button
+          type="button"
+          class="ops-review-button secondary"
+          id="saveCaseKnowledgeBaseButton"
+        >
+          Save to Case-specific Knowledge Base
+        </button>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
+async function loadAiCaseGuidance(
+  caseItem
+) {
+  if (
+    !caseItem ||
+    caseItem.isDummy ||
+    !caseItem.zohoTicketId
+  ) {
+    return;
+  }
+
+  const ticketId =
+    String(
+      caseItem.zohoTicketId
+    ).trim();
+
+  const requestSequence =
+    ++state.aiCaseGuidanceRequestSequence;
+
+
+  state.aiCaseGuidance.set(
+    ticketId,
+    {
+      status: "loading"
+    }
+  );
+
+
+  if (
+    state.selectedCaseId ===
+    caseItem.id
+  ) {
+    renderAiCaseGuidance(
+      caseItem
+    );
+  }
+
+
+  try {
+    const result =
+      await fetchAiCaseGuidance(
+        ticketId
+      );
+
+
+    if (
+      requestSequence !==
+      state.aiCaseGuidanceRequestSequence
+    ) {
+      return;
+    }
+
+
+    state.aiCaseGuidance.set(
+      ticketId,
+      {
+        ...result,
+        status: "ready"
+      }
+    );
+
+
+    if (
+      state.selectedCaseId ===
+      caseItem.id
+    ) {
+      renderAiCaseGuidance(
+        caseItem
+      );
+    }
+
+  } catch (error) {
+
+    console.error(
+      "AI Guidance request failed:",
+      error
+    );
+
+
+    if (
+      requestSequence !==
+      state.aiCaseGuidanceRequestSequence
+    ) {
+      return;
+    }
+
+
+    state.aiCaseGuidance.set(
+      ticketId,
+      {
+        status: "error",
+
+        message:
+          error?.name ===
+            "AbortError"
+            ? "The AI Guidance request timed out."
+            : error?.message ||
+            "AI Guidance could not be loaded."
+      }
+    );
+
+
+    if (
+      state.selectedCaseId ===
+      caseItem.id
+    ) {
+      renderAiCaseGuidance(
+        caseItem
+      );
+    }
+  }
+}
 
 async function fetchAiCaseReport(ticketId) {
   const normalizedTicketId =
@@ -5578,6 +6187,19 @@ async function openCase(caseId) {
   ) {
     return;
   }
+
+  /*
+  Load / refresh AI Guidance whenever
+  Ops opens a real Zoho case.
+
+  n8n decides whether to:
+  - return cached guidance;
+  - generate missing guidance; or
+  - regenerate changed guidance.
+*/
+  loadAiCaseGuidance(
+    selectedCase
+  );
 
   // Reuse previously retrieved history.
   const cachedDetail =
