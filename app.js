@@ -575,6 +575,148 @@ function formatChronologyDate(value) {
   ).format(date);
 }
 
+function chronologyHasExactTime(value) {
+  const text =
+    String(value ?? "").trim();
+
+  return /T\d{1,2}:\d{2}/i.test(text) ||
+    /\s\d{1,2}:\d{2}/i.test(text);
+}
+
+
+function formatChronologyDateOnly(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value || "");
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-SG",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: "Asia/Singapore"
+    }
+  ).format(date);
+}
+
+
+function formatChronologyClock(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-SG",
+    {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Singapore"
+    }
+  ).format(date);
+}
+
+
+function getChronologyDateKey(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "Asia/Singapore"
+    }
+  ).format(date);
+}
+
+
+function formatChronologyRange(item) {
+  const start =
+    String(
+      item?.startTimestamp ||
+      item?.timestamp ||
+      ""
+    ).trim();
+
+  const end =
+    String(
+      item?.endTimestamp ||
+      start
+    ).trim();
+
+  if (!start) {
+    return "";
+  }
+
+  /*
+    If either source only contains a DATE,
+    do not manufacture a time.
+  */
+  const startHasTime =
+    chronologyHasExactTime(start);
+
+  const endHasTime =
+    chronologyHasExactTime(end);
+
+  const sameDate =
+    getChronologyDateKey(start) ===
+    getChronologyDateKey(end);
+
+  const sameTimestamp =
+    start === end;
+
+  if (
+    !startHasTime ||
+    !endHasTime
+  ) {
+    if (sameDate) {
+      return formatChronologyDateOnly(start);
+    }
+
+    return (
+      `${formatChronologyDateOnly(start)} – ` +
+      `${formatChronologyDateOnly(end)}`
+    );
+  }
+
+  /*
+    Only one actual source interaction.
+  */
+  if (sameTimestamp) {
+    return formatChronologyDate(start);
+  }
+
+  /*
+    Several related interactions on same date.
+  */
+  if (sameDate) {
+    return (
+      `${formatChronologyDateOnly(start)}, ` +
+      `${formatChronologyClock(start)} – ` +
+      `${formatChronologyClock(end)}`
+    );
+  }
+
+  /*
+    Development spans more than one date.
+  */
+  return (
+    `${formatChronologyDate(start)} – ` +
+    `${formatChronologyDate(end)}`
+  );
+}
+
 function formatTicketDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -4293,6 +4435,47 @@ function renderMasterChronology(caseItem) {
     chronology
       .map((item) => {
 
+        const sourceRefs =
+          Array.isArray(item.sourceRefs)
+            ? item.sourceRefs
+            : [];
+
+        const sourceButtonsHtml =
+          sourceRefs
+            .filter(
+              sourceRef =>
+                String(
+                  sourceRef?.sourceId || ""
+                ).trim()
+            )
+            .map(
+              sourceRef => `
+        <button
+          type="button"
+          class="chronology-source-button"
+          data-chronology-source-id="${escapeHtml(
+                sourceRef.sourceId || ""
+              )}"
+          data-chronology-channel="${escapeHtml(
+                sourceRef.channel || ""
+              )}"
+          data-chronology-ticket-id="${escapeHtml(
+                sourceRef.ticketId || ""
+              )}"
+          data-chronology-ticket-number="${escapeHtml(
+                sourceRef.ticketNumber || ""
+              )}"
+        >
+          ${escapeHtml(
+                getChronologySourceButtonLabel(
+                  sourceRef
+                )
+              )}
+        </button>
+      `
+            )
+            .join("");
+
         return `
         <article
           class="chronology-entry chronology-${escapeHtml(
@@ -4302,10 +4485,12 @@ function renderMasterChronology(caseItem) {
 
           <div class="chronology-title">
             ${escapeHtml(
-          formatChronologyDate(item.timestamp)
+          formatChronologyRange(item)
         )}
             — 
-            ${escapeHtml(item.actor || "Not identified")}
+            ${escapeHtml(
+          item.actor || "Not identified"
+        )}
           </div>
 
           <div class="chronology-action">
@@ -4322,6 +4507,15 @@ function renderMasterChronology(caseItem) {
               ${escapeHtml(item.source)}
             </div>
           `
+            : ""
+          }
+
+          ${sourceButtonsHtml
+            ? `
+              <div class="chronology-source-actions">
+                ${sourceButtonsHtml}
+              </div>
+            `
             : ""
           }
 
@@ -4498,6 +4692,392 @@ function renderMasterChronology(caseItem) {
         `}
       </div>
   `;
+}
+
+function getChronologySourceButtonLabel(
+  sourceRef
+) {
+  const channel =
+    String(
+      sourceRef?.channel || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const labels = {
+    email: "Email",
+    comment: "Comment",
+    whatsapp: "WhatsApp",
+    velox: "Operi Call"
+  };
+
+  const sourceLabel =
+    labels[channel] || "Source";
+
+  const ticketNumber =
+    String(
+      sourceRef?.ticketNumber || ""
+    ).trim();
+
+  return ticketNumber
+    ? `View ${sourceLabel} · ZD-${ticketNumber}`
+    : `View ${sourceLabel}`;
+}
+
+
+function activateTimelineChannel(channel) {
+  document
+    .querySelectorAll(
+      "#timelineFilters .segment"
+    )
+    .forEach((button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.channel === channel
+      );
+    });
+
+  state.activeTimelineChannel =
+    channel;
+}
+
+
+function findTimelineInteraction(
+  container,
+  interactionId
+) {
+  const normalizedId =
+    String(interactionId || "").trim();
+
+  if (!container || !normalizedId) {
+    return null;
+  }
+
+  return Array.from(
+    container.querySelectorAll(
+      "[data-interaction-id]"
+    )
+  ).find(
+    element =>
+      String(
+        element.dataset.interactionId || ""
+      ).trim() === normalizedId
+  ) || null;
+}
+
+
+function highlightTimelineSource(element) {
+  if (!element) {
+    return;
+  }
+
+  element.classList.add(
+    "chronology-source-highlight"
+  );
+
+  element.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  window.setTimeout(
+    () => {
+      element.classList.remove(
+        "chronology-source-highlight"
+      );
+    },
+    4000
+  );
+}
+
+
+async function loadChronologyTicketGroup(
+  group,
+  ticketId,
+  channel
+) {
+  const detail =
+    await fetchZohoTicketDetail(
+      ticketId
+    );
+
+  const interactions =
+    Array.isArray(detail.interactions)
+      ? detail.interactions
+      : [];
+
+  state.detailCache.set(
+    ticketId,
+    {
+      interactions,
+      totalThreads:
+        detail.totalThreads,
+      totalComments:
+        detail.totalComments
+    }
+  );
+
+  const filtered =
+    channel === "email"
+      ? interactions.filter(
+        item =>
+          item.channel === "email" ||
+          item.channel === "comment"
+      )
+      : interactions.filter(
+        item =>
+          item.channel === channel
+      );
+
+  const content =
+    group.querySelector(
+      ".timeline-ticket-group-content"
+    );
+
+  if (content) {
+    content.innerHTML =
+      renderTimelineInteractions(
+        filtered
+      );
+  }
+
+  group.dataset.ticketGroupLoaded =
+    "true";
+
+  const count =
+    group.querySelector(
+      ".timeline-group-count"
+    );
+
+  if (count) {
+    count.textContent =
+      filtered.length;
+  }
+
+  elements.timelineCount.textContent =
+    document.querySelectorAll(
+      "#timelineContainer .timeline-entry"
+    ).length;
+}
+
+
+async function navigateToChronologySource(
+  sourceRef
+) {
+  const selectedCase =
+    state.cases.find(
+      item =>
+        item.id ===
+        state.selectedCaseId
+    );
+
+  if (!selectedCase) {
+    showToast(
+      "Unable to identify the current case."
+    );
+    return;
+  }
+
+  const sourceId =
+    String(
+      sourceRef?.sourceId || ""
+    ).trim();
+
+  const sourceChannel =
+    String(
+      sourceRef?.channel || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  /*
+    OPERI CALL
+  */
+  if (sourceChannel === "velox") {
+    activateTimelineChannel(
+      "velox"
+    );
+
+    renderTimeline(
+      selectedCase
+    );
+
+    await new Promise(
+      resolve =>
+        requestAnimationFrame(resolve)
+    );
+
+    const interaction =
+      findTimelineInteraction(
+        elements.timelineContainer,
+        sourceId
+      );
+
+    if (!interaction) {
+      showToast(
+        "The Operi call source could not be located."
+      );
+      return;
+    }
+
+    const group =
+      interaction.closest(
+        ".timeline-ticket-group"
+      );
+
+    if (group) {
+      group.open = true;
+    }
+
+    highlightTimelineSource(
+      interaction
+    );
+
+    return;
+  }
+
+
+  /*
+    EMAIL / COMMENT / WHATSAPP
+
+    Comments appear under Email.
+  */
+  const timelineChannel =
+    sourceChannel === "whatsapp"
+      ? "whatsapp"
+      : "email";
+
+  activateTimelineChannel(
+    timelineChannel
+  );
+
+  /*
+    Use the normal timeline renderer so
+    Master Chronology mode is removed
+    before showing Email / WhatsApp.
+  */
+  renderTimeline(
+    selectedCase
+  );
+
+  await new Promise(
+    resolve =>
+      requestAnimationFrame(resolve)
+  );
+
+
+  const ticketId =
+    String(
+      sourceRef?.ticketId || ""
+    ).trim();
+
+  if (!ticketId) {
+    showToast(
+      "The source ticket could not be identified."
+    );
+    return;
+  }
+
+
+  const group =
+    Array.from(
+      document.querySelectorAll(
+        "#timelineContainer .timeline-ticket-group"
+      )
+    ).find(
+      element =>
+        String(
+          element.dataset.ticketGroupId ||
+          ""
+        ).trim() === ticketId
+    );
+
+  if (!group) {
+    showToast(
+      "The Parent/Child ticket could not be located."
+    );
+    return;
+  }
+
+  group.open = true;
+
+
+  /*
+    Child ticket history may not have been
+    loaded yet. Load it automatically.
+  */
+  if (
+    group.dataset.ticketGroupLoaded !==
+    "true"
+  ) {
+    try {
+      await loadChronologyTicketGroup(
+        group,
+        ticketId,
+        timelineChannel
+      );
+    } catch (error) {
+      console.error(
+        "Unable to load chronology source:",
+        error
+      );
+
+      showToast(
+        "Unable to load the source interaction."
+      );
+
+      return;
+    }
+  }
+
+
+  let interaction =
+    findTimelineInteraction(
+      group,
+      sourceId
+    );
+
+
+  /*
+    Parent history might be cached but stale.
+    Refresh once if the exact source isn't found.
+  */
+  if (!interaction) {
+    try {
+      await loadChronologyTicketGroup(
+        group,
+        ticketId,
+        timelineChannel
+      );
+
+      interaction =
+        findTimelineInteraction(
+          group,
+          sourceId
+        );
+    } catch {
+      // handled below
+    }
+  }
+
+
+  if (!interaction) {
+    showToast(
+      "The ticket was opened, but the exact source interaction could not be located."
+    );
+
+    group.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+    return;
+  }
+
+
+  highlightTimelineSource(
+    interaction
+  );
 }
 
 function renderTimeline(caseItem) {
@@ -7243,6 +7823,33 @@ function bindEvents() {
         event.target.closest(
           "[data-velox-id]"
         );
+
+      const chronologySourceButton =
+        event.target.closest(
+          ".chronology-source-button"
+        );
+
+      if (chronologySourceButton) {
+        await navigateToChronologySource({
+          sourceId:
+            chronologySourceButton.dataset
+              .chronologySourceId,
+
+          channel:
+            chronologySourceButton.dataset
+              .chronologyChannel,
+
+          ticketId:
+            chronologySourceButton.dataset
+              .chronologyTicketId,
+
+          ticketNumber:
+            chronologySourceButton.dataset
+              .chronologyTicketNumber
+        });
+
+        return;
+      }
 
       if (veloxTarget) {
         openVeloxTranscript(

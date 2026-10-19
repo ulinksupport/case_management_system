@@ -2187,6 +2187,35 @@ tr[data-velox-id] .secondary-text {
   font-weight: 600;
 }
 
+.chronology-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chronology-source-button {
+  padding: 5px 9px;
+  border: 1px solid #b9d9e4;
+  border-radius: 7px;
+  background: #f7fcfe;
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.chronology-source-button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.timeline-entry.chronology-source-highlight .timeline-card {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  background: #f8fdff;
+}
+
 
 @media (max-width: 800px) {
   .chronology-status-grid {
