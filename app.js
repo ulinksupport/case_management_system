@@ -1255,7 +1255,7 @@ function mapZohoDetailEventToInteraction(event) {
 
     party,
 
-    time: formatTicketTime(
+    time: formatTicketDate(
       event.timestamp
     ),
 
