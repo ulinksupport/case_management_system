@@ -6447,6 +6447,17 @@ function bindEvents() {
       if (viewName === "velox") {
         refreshVeloxData();
       }
+
+      if (viewName === "cases") {
+        refreshDashboardData().catch(
+          (error) => {
+            console.error(
+              "Unable to refresh Zoho Cases:",
+              error
+            );
+          }
+        );
+      }
     });
   });
 
@@ -7637,6 +7648,14 @@ function buildSnapshotSignature(snapshot) {
   });
 }
 
+function isCasesOverviewActive() {
+  return Boolean(
+    document
+      .getElementById("view-cases")
+      ?.classList.contains("active")
+  );
+}
+
 async function refreshDashboardData() {
   // Prevent overlapping requests when the
   // previous request is still running.
@@ -7649,6 +7668,46 @@ async function refreshDashboardData() {
   try {
     const snapshot =
       await dataRepository.getDashboardSnapshot();
+
+    /*
+  IMPORTANT:
+  Never replace already-loaded LIVE data
+  with dummy data because of a temporary
+  Zoho / n8n refresh failure.
+*/
+    const alreadyHasLiveData =
+      state.dataMode === "live" &&
+      state.cases.some(
+        item => !item.isDummy
+      );
+
+    if (
+      alreadyHasLiveData &&
+      snapshot.mode !== "live"
+    ) {
+      console.warn(
+        "Background refresh returned non-live data. Keeping current live dashboard."
+      );
+
+      return;
+    }
+
+    /*
+      Also protect against an unexpected
+      empty live response wiping the dashboard.
+    */
+    if (
+      alreadyHasLiveData &&
+      snapshot.mode === "live" &&
+      Array.isArray(snapshot.cases) &&
+      snapshot.cases.length === 0
+    ) {
+      console.warn(
+        "Background refresh returned 0 live cases. Keeping current dashboard."
+      );
+
+      return;
+    }
 
     const newSignature =
       buildSnapshotSignature(snapshot);
@@ -7769,7 +7828,15 @@ async function initializeDashboard() {
     }
 
     window.setInterval(() => {
-      if (document.hidden) {
+      /*
+        Do not rebuild the main dashboard
+        while Ops is working inside another
+        CMS view or an opened case.
+      */
+      if (
+        document.hidden ||
+        !isCasesOverviewActive()
+      ) {
         return;
       }
 
@@ -7786,16 +7853,21 @@ async function initializeDashboard() {
     document.addEventListener(
       "visibilitychange",
       () => {
-        if (!document.hidden) {
-          refreshDashboardData().catch(
-            (error) => {
-              console.error(
-                "Dashboard refresh after tab activation failed:",
-                error
-              );
-            }
-          );
+        if (
+          document.hidden ||
+          !isCasesOverviewActive()
+        ) {
+          return;
         }
+
+        refreshDashboardData().catch(
+          (error) => {
+            console.error(
+              "Dashboard refresh after tab activation failed:",
+              error
+            );
+          }
+        );
       }
     );
   } catch (error) {
