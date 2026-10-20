@@ -3810,6 +3810,21 @@ function renderCaseDetail(caseItem) {
   state.activeTimelineChannel =
     activeChannelBeforeRender;
 
+  window.dispatchEvent(
+    new CustomEvent(
+      "cms-case-changed",
+      {
+        detail: {
+          caseId: caseItem.id,
+          ticketId:
+            caseItem.zohoTicketId || "",
+          label:
+            caseItem.id || "Case"
+        }
+      }
+    )
+  );
+
   const aiSummaryTab =
     document.getElementById(
       "aiSummaryTab"
@@ -7189,6 +7204,15 @@ function bindEvents() {
       caseDetailRefreshTimer = null;
 
       state.selectedCaseId = null;
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "cms-case-changed",
+          {
+            detail: null
+          }
+        )
+      );
 
       window.history.replaceState(
         {},

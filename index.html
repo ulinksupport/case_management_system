@@ -8,6 +8,7 @@
   <meta name="description" content="Ulink Assist Case Management System dashboard." />
   <title>Ulink Assist | Case Management System</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="chatbot.css">
 </head>
 
 <body>
@@ -482,7 +483,53 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- -------------------------------------------------- -->
+  <!-- CASE AI CHATBOT -->
+  <!-- -------------------------------------------------- -->
+
+  <button type="button" id="caseChatbotLauncher" class="case-chatbot-launcher" aria-label="Open Case AI Assistant">
+    AI
+  </button>
+
+  <section id="caseChatbotPanel" class="case-chatbot-panel" hidden>
+    <div class="case-chatbot-header">
+      <div>
+        <strong>Case AI Assistant</strong>
+        <div id="caseChatbotCaseLabel" class="case-chatbot-case-label">
+          No case selected
+        </div>
+      </div>
+
+      <button type="button" id="caseChatbotClose" class="case-chatbot-close" aria-label="Close chatbot">
+        ×
+      </button>
+    </div>
+
+    <div id="caseChatbotMessages" class="case-chatbot-messages">
+      <div class="case-chatbot-message assistant">
+        Ask me anything about the current case.
+      </div>
+    </div>
+
+    <form id="caseChatbotForm" class="case-chatbot-form">
+      <textarea id="caseChatbotInput" rows="2" placeholder="Ask about this case..."></textarea>
+
+      <button type="submit" id="caseChatbotSend">
+        Send
+      </button>
+    </form>
+  </section>
+
+  <!-- -------------------------------------------------- -->
+  <!-- END CASE AI CHATBOT -->
+  <!-- -------------------------------------------------- -->
+
+
   <script src="app.js"></script>
+  <script src="chatbot.js"></script>
 </body>
 
 </html>
