@@ -20,6 +20,9 @@ const appConfig = {
     zohoTicketDetail:
       "/webhook/zoho-ticket-detail",
 
+    markReplyHandled:
+      "/webhook/cms-mark-reply-handled",
+
     aiCaseReport:
       "/webhook/ai-case-report",
 
@@ -963,6 +966,26 @@ function mapZohoTicketToCase(ticket, index) {
     channels: [channel],
     isDummy: false,
     dataSource: "live",
+    needsReply:
+      ticket.needsReply === true,
+
+    replyStateReady:
+      ticket.replyStateReady === true,
+
+    latestIncomingAt:
+      String(
+        ticket.latestIncomingAt ?? ""
+      ).trim(),
+
+    latestIncomingEventId:
+      String(
+        ticket.latestIncomingEventId ?? ""
+      ).trim(),
+
+    latestOutgoingAt:
+      String(
+        ticket.latestOutgoingAt ?? ""
+      ).trim(),
     relatedTickets: Array.isArray(ticket.relatedTickets)
       ? ticket.relatedTickets.map((item) => ({
         ticketId: String(item.ticketId ?? "").trim(),
@@ -1701,6 +1724,8 @@ const elements = {
   caseTypeFilter: document.getElementById("caseTypeFilter"),
   matchFilter: document.getElementById("matchFilter"),
   caseCount: document.getElementById("caseCount"),
+  unrepliedCount:
+    document.getElementById("unrepliedCount"),
   caseTableBody: document.getElementById("caseTableBody"),
   casePrevPage:
     document.getElementById("casePrevPage"),
@@ -2019,12 +2044,99 @@ function getChannelLabel(channel) {
   return labels[channel] ?? "?";
 }
 
+async function markReplyHandled(
+  ticketId,
+  eventId
+) {
+  const normalizedTicketId =
+    String(ticketId || "").trim();
+
+  const normalizedEventId =
+    String(eventId || "").trim();
+
+  if (
+    !normalizedTicketId ||
+    !normalizedEventId
+  ) {
+    showToast(
+      "Unable to mark this message as handled."
+    );
+
+    return;
+  }
+
+  const response =
+    await fetch(
+      buildApiUrl(
+        appConfig.endpoints
+          .markReplyHandled
+      ),
+      {
+        method: "POST",
+
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          ticketId:
+            normalizedTicketId,
+
+          eventId:
+            normalizedEventId
+        })
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Mark handled returned HTTP ${response.status}`
+    );
+  }
+
+  const caseItem =
+    state.cases.find(
+      (item) =>
+        String(
+          item.zohoTicketId || ""
+        ).trim() ===
+        normalizedTicketId
+    );
+
+  if (
+    caseItem &&
+    caseItem.latestIncomingEventId ===
+    normalizedEventId
+  ) {
+    caseItem.needsReply = false;
+  }
+
+  renderCaseTable();
+
+  showToast(
+    "Message marked as handled."
+  );
+}
+
 function renderCaseTable() {
   const query = elements.caseSearch.value.trim().toLowerCase();
   const type = elements.caseTypeFilter.value;
   const match = elements.matchFilter.value;
   const relationship =
     state.relationshipFilter || "all";
+
+  const unrepliedCount =
+    state.cases.filter(
+      (item) =>
+        item.needsReply === true &&
+        item.replyStateReady === true
+    ).length;
+
+  if (elements.unrepliedCount) {
+    elements.unrepliedCount.textContent =
+      unrepliedCount;
+  }
 
   const linkedZohoTicketIds =
     new Set(
@@ -2096,6 +2208,7 @@ function renderCaseTable() {
       && (match === "all" || item.matchState === match)
       && (
         relationship === "all" ||
+
         (
           relationship === "Parent" &&
           (
@@ -2105,9 +2218,16 @@ function renderCaseTable() {
             ).trim()
           )
         ) ||
+
         (
           relationship === "Child" &&
           item.associatedType === "Child"
+        ) ||
+
+        (
+          relationship === "unreplied" &&
+          item.needsReply === true &&
+          item.replyStateReady === true
         )
       );
   });
@@ -2268,6 +2388,23 @@ function renderCaseTable() {
       <td>
         <div class="primary-text">${escapeHtml(item.updatedAt)}</div>
         <div class="secondary-text">${escapeHtml(item.updatedTime)}</div>
+
+        ${state.relationshipFilter === "unreplied" &&
+          item.needsReply === true &&
+          item.latestIncomingEventId
+          ? `
+              <button
+                type="button"
+                class="media-view-button mark-reply-handled-button"
+                data-mark-reply-handled
+                data-ticket-id="${escapeHtml(item.zohoTicketId)}"
+                data-event-id="${escapeHtml(item.latestIncomingEventId)}"
+              >
+                Mark handled
+              </button>
+            `
+          : ""
+        }
       </td>
     </tr>
   `}).join("");
@@ -7881,6 +8018,49 @@ function bindEvents() {
         openZohoTicketInNewTab(
           zohoTicketTarget.dataset.zohoTicketId
         );
+
+        return;
+      }
+
+      const markHandledButton =
+        event.target.closest(
+          "[data-mark-reply-handled]"
+        );
+
+      if (markHandledButton) {
+        event.preventDefault();
+
+        const ticketId =
+          markHandledButton.dataset
+            .ticketId;
+
+        const eventId =
+          markHandledButton.dataset
+            .eventId;
+
+        markHandledButton.disabled = true;
+        markHandledButton.textContent =
+          "Saving...";
+
+        try {
+          await markReplyHandled(
+            ticketId,
+            eventId
+          );
+        } catch (error) {
+          console.error(
+            "Mark reply handled failed:",
+            error
+          );
+
+          showToast(
+            "Unable to mark this message as handled."
+          );
+
+          markHandledButton.disabled = false;
+          markHandledButton.textContent =
+            "Mark handled";
+        }
 
         return;
       }
