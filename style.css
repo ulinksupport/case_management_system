@@ -747,6 +747,24 @@ table {
   border-collapse: collapse;
 }
 
+.pill.priority-high {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.pill.priority-medium {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.pill.priority-low {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
 th {
   padding: 10px 13px;
   border-bottom: 1px solid var(--border);

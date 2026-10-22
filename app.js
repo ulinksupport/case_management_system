@@ -784,6 +784,7 @@ function mapZohoTicketToCase(ticket, index) {
     String(ticket.nationality ?? "").trim();
   const requestorEmail = String(ticket.requestorEmail ?? "").trim();
   const status = String(ticket.status ?? "").trim() || "Unknown";
+  const priority = String(ticket.priority ?? "").trim() || "Not set";
   const channel = normalizeChannel(ticket.channel);
   const createdAt = ticket.createdAt || "";
   const updatedAt =
@@ -953,6 +954,7 @@ function mapZohoTicketToCase(ticket, index) {
     caseTypeLabel: "Zoho ticket",
     caseDescription: subject,
     status,
+    priority,
     client: requestorEmail || "Not identified",
     hospital: "Not available",
     admissionDate: formatTicketDate(createdAt),
@@ -1727,6 +1729,8 @@ const elements = {
   unrepliedCount:
     document.getElementById("unrepliedCount"),
   caseTableBody: document.getElementById("caseTableBody"),
+  casePriorityHeader:
+    document.getElementById("casePriorityHeader"),
   casePrevPage:
     document.getElementById("casePrevPage"),
 
@@ -1952,6 +1956,27 @@ function getLinkStatusClass(matchState) {
   return "grey";
 }
 
+function getPriorityClass(priority) {
+  const value =
+    String(priority ?? "")
+      .trim()
+      .toLowerCase();
+
+  if (value === "high") {
+    return "priority-high";
+  }
+
+  if (value === "medium") {
+    return "priority-medium";
+  }
+
+  if (value === "low") {
+    return "priority-low";
+  }
+
+  return "grey";
+}
+
 function getLinkStatusText(caseItem) {
   if (
     caseItem.matchState === "not-evaluated" ||
@@ -2126,11 +2151,22 @@ function renderCaseTable() {
   const relationship =
     state.relationshipFilter || "all";
 
+  const showPriority =
+    relationship === "unreplied";
+
+  if (elements.casePriorityHeader) {
+    elements.casePriorityHeader.hidden =
+      !showPriority;
+  }
+
   const unrepliedCount =
     state.cases.filter(
       (item) =>
         item.needsReply === true &&
-        item.replyStateReady === true
+        item.replyStateReady === true &&
+        String(item.status ?? "")
+          .trim()
+          .toLowerCase() !== "closed"
     ).length;
 
   if (elements.unrepliedCount) {
@@ -2227,7 +2263,10 @@ function renderCaseTable() {
         (
           relationship === "unreplied" &&
           item.needsReply === true &&
-          item.replyStateReady === true
+          item.replyStateReady === true &&
+          String(item.status ?? "")
+            .trim()
+            .toLowerCase() !== "closed"
         )
       );
   });
@@ -2275,7 +2314,11 @@ function renderCaseTable() {
     state.casePage >= totalPages;
 
   if (!filtered.length) {
-    elements.caseTableBody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No cases match the current filters.</div></td></tr>`;
+    const tableColumnCount =
+      showPriority ? 8 : 7;
+
+    elements.caseTableBody.innerHTML =
+      `<tr><td colspan="${tableColumnCount}"><div class="empty-state">No cases match the current filters.</div></td></tr>`;
     return;
   }
 
@@ -2382,9 +2425,21 @@ function renderCaseTable() {
       </td>
       <td>
         <span class="pill ${displayLinkClass}">
-        ${escapeHtml(displayLinkText)}
+          ${escapeHtml(displayLinkText)}
         </span>
       </td>
+
+      ${showPriority
+          ? `
+      <td>
+        <span class="pill ${getPriorityClass(item.priority)}">
+          ${escapeHtml(item.priority || "Not set")}
+        </span>
+      </td>
+    `
+          : ""
+        }
+
       <td>
         <div class="primary-text">${escapeHtml(item.updatedAt)}</div>
         <div class="secondary-text">${escapeHtml(item.updatedTime)}</div>
