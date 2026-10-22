@@ -784,7 +784,7 @@ function mapZohoTicketToCase(ticket, index) {
     String(ticket.nationality ?? "").trim();
   const requestorEmail = String(ticket.requestorEmail ?? "").trim();
   const status = String(ticket.status ?? "").trim() || "Unknown";
-  const priority = String(ticket.priority ?? "").trim() || "Not set";
+  const priority = String(ticket.priority ?? "").trim();
   const channel = normalizeChannel(ticket.channel);
   const createdAt = ticket.createdAt || "";
   const updatedAt =
@@ -2433,7 +2433,7 @@ function renderCaseTable() {
           ? `
       <td>
         <span class="pill ${getPriorityClass(item.priority)}">
-          ${escapeHtml(item.priority || "Not set")}
+          ${escapeHtml(item.priority || "—")}
         </span>
       </td>
     `
