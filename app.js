@@ -29,6 +29,9 @@ const appConfig = {
     aiCaseGuidance:
       "/webhook/cms-ai-guidance",
 
+    aiCaseGuidanceResolve:
+      "/webhook/cms-ai-guidance-resolve",
+
     aiMasterChronology:
       "/webhook/ai-master-chronology",
 
@@ -6404,6 +6407,68 @@ async function fetchAiCaseGuidance(ticketId) {
   }
 }
 
+async function resolveAiGuidanceAction(
+  caseIdentifier,
+  dismissedAction
+) {
+  const normalizedCaseIdentifier =
+    String(caseIdentifier || "").trim();
+
+  const normalizedAction =
+    String(dismissedAction || "").trim();
+
+  if (
+    !normalizedCaseIdentifier ||
+    !normalizedAction
+  ) {
+    throw new Error(
+      "Case identifier and dismissed action are required."
+    );
+  }
+
+  const response =
+    await fetch(
+      buildApiUrl(
+        appConfig.endpoints
+          .aiCaseGuidanceResolve
+      ),
+      {
+        method: "POST",
+
+        headers: {
+          Accept: "application/json",
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+          caseIdentifier:
+            normalizedCaseIdentifier,
+
+          dismissedAction:
+            normalizedAction
+        })
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `AI guidance resolution returned HTTP ${response.status}`
+    );
+  }
+
+  const result =
+    await response.json();
+
+  if (!result?.success) {
+    throw new Error(
+      result?.message ||
+      "Unable to dismiss AI guidance action."
+    );
+  }
+
+  return result;
+}
 
 function renderAiCaseGuidance(caseItem) {
   const ticketId =
@@ -6572,6 +6637,22 @@ function renderAiCaseGuidance(caseItem) {
                 `
             : ""
           }
+
+          <div class="ai-guidance-item-actions">
+            <button
+              type="button"
+              class="media-view-button ai-guidance-resolve-button"
+              data-ai-guidance-resolve
+              data-case-identifier="${escapeHtml(
+            guidance.caseIdentifier || ""
+          )}"
+              data-dismissed-action="${escapeHtml(
+            step.action || ""
+          )}"
+            >
+              Resolved / Not required
+            </button>
+          </div>
 
           </div>
         `)
@@ -8026,6 +8107,128 @@ function bindEvents() {
             isExpanded
               ? "Show less"
               : "Read more";
+        }
+
+        return;
+      }
+
+      const aiGuidanceResolveButton =
+        event.target.closest(
+          "[data-ai-guidance-resolve]"
+        );
+
+      if (aiGuidanceResolveButton) {
+        event.preventDefault();
+
+        const caseIdentifier =
+          String(
+            aiGuidanceResolveButton
+              .dataset.caseIdentifier || ""
+          ).trim();
+
+        const dismissedAction =
+          String(
+            aiGuidanceResolveButton
+              .dataset.dismissedAction || ""
+          ).trim();
+
+        if (
+          !caseIdentifier ||
+          !dismissedAction
+        ) {
+          showToast(
+            "Unable to dismiss this AI guidance action."
+          );
+
+          return;
+        }
+
+        aiGuidanceResolveButton.disabled =
+          true;
+
+        aiGuidanceResolveButton.textContent =
+          "Saving...";
+
+        try {
+          await resolveAiGuidanceAction(
+            caseIdentifier,
+            dismissedAction
+          );
+
+          const selectedCase =
+            state.cases.find(
+              item =>
+                item.id ===
+                state.selectedCaseId
+            );
+
+          if (selectedCase) {
+            const ticketId =
+              String(
+                selectedCase.zohoTicketId || ""
+              ).trim();
+
+            const guidance =
+              state.aiCaseGuidance.get(
+                ticketId
+              );
+
+            if (
+              guidance &&
+              Array.isArray(
+                guidance.nextSteps
+              )
+            ) {
+              const normalizeAction =
+                value =>
+                  String(value || "")
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\s+/g, " ");
+
+              const dismissed =
+                normalizeAction(
+                  dismissedAction
+                );
+
+              guidance.nextSteps =
+                guidance.nextSteps.filter(
+                  step =>
+                    normalizeAction(
+                      step?.action
+                    ) !== dismissed
+                );
+
+              state.aiCaseGuidance.set(
+                ticketId,
+                guidance
+              );
+
+              renderAiCaseGuidance(
+                selectedCase
+              );
+            }
+          }
+
+          showToast(
+            "AI guidance action dismissed."
+          );
+
+        } catch (error) {
+          console.error(
+            "AI guidance dismissal failed:",
+            error
+          );
+
+          showToast(
+            "Unable to dismiss this AI guidance action."
+          );
+
+          aiGuidanceResolveButton.disabled =
+            false;
+
+          aiGuidanceResolveButton.textContent =
+            "Resolved / Not required";
         }
 
         return;
