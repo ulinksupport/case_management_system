@@ -1,3 +1,57 @@
+/* ULINK logo match theme temporary code:
+:root {
+  --bg: #f8f7f5;
+  --surface: #ffffff;
+  --surface-soft: #fcfaf8;
+  --border: #eadfd7;
+  --text: #2b2a28;
+  --muted: #756d68;
+
+  --brand: #f47a20;
+  --brand-dark: #c85c0f;
+  --brand-soft: #fff0e3;
+
+  --nav: #3d2a20;
+  --nav-deep: #2d1e17;
+
+  --success: #16835f;
+  --success-bg: #e9f7f1;
+
+  --warning: #d97706;
+  --warning-bg: #fff4db;
+
+  --danger: #c2413b;
+  --danger-bg: #fff0ef;
+
+  --purple: #6d56b5;
+  --purple-bg: #f0ecff;
+
+  --shadow: 0 8px 24px rgba(31, 45, 61, 0.07);
+  --radius: 14px;
+}
+
+.relationship-tab.active {
+  background: var(--brand);
+  color: #ffffff;
+  border-color: var(--brand);
+}
+
+.nav-item.active {
+  color: #fff;
+  background: rgba(244, 122, 32, 0.18);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.avatar {
+  background: linear-gradient(
+    135deg,
+    var(--brand-dark),
+    var(--brand)
+  );
+}
+
+*/
+
 :root {
   --bg: #f4f7fb;
   --surface: #ffffff;

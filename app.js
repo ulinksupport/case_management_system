@@ -6411,6 +6411,29 @@ function renderAiCaseGuidance(caseItem) {
       caseItem?.zohoTicketId || ""
     ).trim();
 
+  const isClosed =
+    String(
+      caseItem?.status || ""
+    )
+      .trim()
+      .toLowerCase() === "closed";
+
+  if (isClosed) {
+    elements.aiPanel.innerHTML = `
+      <div class="ai-guidance-status">
+        <strong>
+          Case Closed
+        </strong>
+
+        <div>
+          No further AI guidance is required for this case.
+        </div>
+      </div>
+    `;
+
+    return;
+  }
+
   if (!ticketId) {
     elements.aiPanel.innerHTML = `
       <div class="empty-state">
@@ -6738,13 +6761,17 @@ function renderAiCaseGuidance(caseItem) {
 }
 
 
+
 async function loadAiCaseGuidance(
   caseItem
 ) {
   if (
     !caseItem ||
     caseItem.isDummy ||
-    !caseItem.zohoTicketId
+    !caseItem.zohoTicketId ||
+    String(caseItem.status ?? "")
+      .trim()
+      .toLowerCase() === "closed"
   ) {
     return;
   }
@@ -6978,7 +7005,7 @@ async function openCase(caseId) {
   /*
   Load / refresh AI Guidance whenever
   Ops opens a real Zoho case.
-
+ 
   n8n decides whether to:
   - return cached guidance;
   - generate missing guidance; or
