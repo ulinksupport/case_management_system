@@ -56,6 +56,13 @@
           <span class="nav-text">Velox Transcripts</span>
           <span class="nav-count" id="navVeloxCount">0</span>
         </button>
+
+        <button class="nav-item" data-view="whatsapp" type="button">
+          <span class="nav-icon">◉</span>
+          <span class="nav-text">WhatsApp Chats</span>
+          <span class="nav-count" id="navWhatsappCount">0</span>
+        </button>
+
         <button class="nav-item" data-view="ingestion" type="button">
           <span class="nav-icon">⇅</span>
           <span class="nav-text">Ingestion Status</span>
@@ -296,6 +303,77 @@
           </section>
         </section>
 
+
+        <!-- WHATSAPP CHATS LIST -->
+        <section class="view" id="view-whatsapp">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">WHATSAPP HISTORY</p>
+              <h1>WhatsApp Chats</h1>
+              <p class="page-description">
+                Read-only WhatsApp conversation history
+                imported from the Operi audit folders.
+                Conversations may be linked to Zoho Cases later.
+              </p>
+            </div>
+
+            <div class="last-updated">
+              <strong id="whatsappSummary">0 conversations</strong>
+              <br />
+              Read-only visibility
+            </div>
+          </div>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>WhatsApp Conversations</h2>
+                <p>Select a conversation to read its full chat history</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <input id="whatsappSearch" type="search" placeholder="Search contact, phone or chat ID..." />
+
+              <span class="result-count">
+                <strong id="whatsappCount">0</strong>
+                conversations shown
+              </span>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Contact</th>
+                    <th>Phone</th>
+                    <th>Messages</th>
+                    <th>First Message</th>
+                    <th>Last Message</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+
+                <tbody id="whatsappTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-pagination" id="whatsappPagination">
+              <button class="pagination-button" id="whatsappPrevPage" type="button">‹</button>
+
+              <span class="pagination-page-info" id="whatsappPageInfo">Page 1 of 1</span>
+
+              <button class="pagination-button" id="whatsappNextPage" type="button">›</button>
+
+              <select class="pagination-page-size" id="whatsappPageSize" aria-label="Conversations per page">
+                <option value="10" selected>10 / page</option>
+                <option value="25">25 / page</option>
+                <option value="50">50 / page</option>
+              </select>
+            </div>
+          </section>
+        </section>
+
         <section class="view" id="view-ingestion">
           <div class="page-heading">
             <div>
@@ -332,6 +410,61 @@
             </div>
           </section>
         </section>
+
+
+        <!-- WHATSAPP CONVERSATION DETAIL -->
+        <section class="view" id="view-whatsapp-detail">
+
+          <button class="back-button" id="whatsappBackButton" type="button">
+            ← Back to WhatsApp Chats
+          </button>
+
+          <section class="card case-hero" id="whatsappHero"></section>
+
+          <div class="detail-grid">
+
+            <!-- CHAT HISTORY -->
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Chat History</h2>
+                  <p>
+                    Full WhatsApp conversation,
+                    displayed in chronological order
+                  </p>
+                </div>
+
+                <span class="readonly-mini">
+                  Read-only
+                </span>
+              </div>
+
+              <div class="whatsapp-chat-history" id="whatsappChatContent">
+                <div class="empty-state">
+                  Select a WhatsApp conversation
+                  to view its messages.
+                </div>
+              </div>
+            </section>
+
+            <!-- CONVERSATION INFORMATION -->
+            <aside class="side-stack">
+              <section class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Conversation Record</h2>
+                    <p>Contact and source information</p>
+                  </div>
+                </div>
+
+                <div class="record-list" id="whatsappFileRecord"></div>
+              </section>
+            </aside>
+
+          </div>
+        </section>
+        <!-- END WHATSAPP CONVERSATION DETAIL -->
+
 
         <section class="view" id="view-velox-detail">
           <button class="back-button" id="veloxBackButton" type="button">

@@ -2466,6 +2466,126 @@ tr[data-velox-id] .secondary-text {
 }
 
 
+/* ==========================================
+   WHATSAPP CHATS — READ-ONLY VIEW
+   ========================================== */
+
+.whatsapp-chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f7f9fb;
+}
+
+/* Individual message bubble */
+.whatsapp-message {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: fit-content;
+  max-width: 78%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+/* Messages received from customers */
+.whatsapp-message.incoming {
+  align-self: flex-start;
+  border-bottom-left-radius: 3px;
+}
+
+/* Messages sent by Ulink Assist */
+.whatsapp-message.outgoing {
+  align-self: flex-end;
+  border-color: #cce9dd;
+  border-bottom-right-radius: 3px;
+  background: #e7f6ee;
+}
+
+/* WhatsApp system messages */
+.whatsapp-message.system {
+  align-self: center;
+  max-width: 90%;
+  border-color: #e5e9ef;
+  background: #eef2f6;
+  text-align: center;
+}
+
+/* Sender name */
+.whatsapp-message-sender {
+  color: var(--brand-dark);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Message content */
+.whatsapp-message-body {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Message timestamp */
+.whatsapp-message-time {
+  align-self: flex-end;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+/* Conversation record information */
+#whatsappFileRecord {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+#whatsappFileRecord>div {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+#whatsappFileRecord>div:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Clickable conversation table rows */
+#whatsappTableBody tr[data-whatsapp-id] {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+#whatsappTableBody tr[data-whatsapp-id]:hover {
+  background: #f0f7fa;
+}
+
+#whatsappTableBody tr[data-whatsapp-id]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .whatsapp-chat-history {
+    padding: 12px;
+    max-height: 65vh;
+  }
+
+  .whatsapp-message {
+    max-width: 90%;
+  }
+}
+
+
 
 [hidden] {
   display: none !important;

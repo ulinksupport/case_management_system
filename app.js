@@ -38,8 +38,12 @@ const appConfig = {
     veloxTranscripts:
       "/webhook/velox-transcripts-feed",
 
+    whatsappChats:
+      "/webhook/cms-whatsapp-chats-feed",
+
     veloxManualLink:
       "/webhook/manually-link-case"
+
   },
 
   zohoRefreshIntervalMs: 15000
@@ -1326,6 +1330,118 @@ async function fetchVeloxTranscripts() {
   }
 }
 
+
+async function fetchWhatsappConversations() {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    30000
+  );
+
+  try {
+    const response = await fetch(
+      buildApiUrl(appConfig.endpoints.whatsappChats),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `WhatsApp feed returned HTTP ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+
+    const root = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (
+      !root?.success ||
+      !Array.isArray(root.conversations)
+    ) {
+      throw new Error(
+        "WhatsApp response did not contain a conversations array."
+      );
+    }
+
+    return root.conversations.map((item) => {
+      let messages = [];
+
+      try {
+        const parsed =
+          typeof item.messages_json === "string"
+            ? JSON.parse(item.messages_json)
+            : item.messages_json;
+
+        messages = Array.isArray(parsed)
+          ? parsed
+          : [];
+      } catch {
+        messages = [];
+      }
+
+      let contactNames = [];
+
+      try {
+        const parsed =
+          typeof item.contact_names_json === "string"
+            ? JSON.parse(item.contact_names_json)
+            : item.contact_names_json;
+
+        contactNames = Array.isArray(parsed)
+          ? parsed
+          : [];
+      } catch {
+        contactNames = [];
+      }
+
+      return {
+        id: String(item.chat_id ?? "").trim(),
+        chatId: String(item.chat_id ?? "").trim(),
+
+        contactPhone:
+          String(item.contact_phone ?? "").trim(),
+
+        contactNames,
+
+        contactName:
+          contactNames[0] ||
+          String(item.contact_phone ?? "").trim() ||
+          "Unknown contact",
+
+        messageCount:
+          Number(item.message_count ?? messages.length),
+
+        firstMessageAt:
+          String(item.first_message_at ?? "").trim(),
+
+        lastMessageAt:
+          String(item.last_message_at ?? "").trim(),
+
+        source:
+          String(item.source ?? "WhatsApp").trim(),
+
+        messages,
+
+        syncedAt:
+          String(item.synced_at ?? "").trim()
+      };
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
 function mapZohoDetailEventToInteraction(event) {
   const eventType = String(
     event.eventType ?? ""
@@ -1673,6 +1789,16 @@ const state = {
   veloxPageSize: 10,
 
   selectedVeloxId: null,
+
+
+  // WhatsApp Chats
+  whatsappConversations: [],
+  whatsappPage: 1,
+  whatsappPageSize: 10,
+  selectedWhatsappId: null,
+  whatsappLoading: false,
+  whatsappError: null,
+
 
   relationshipFilter: "all",
 
@@ -2691,6 +2817,330 @@ function renderVeloxTable() {
         `;
       })
       .join("");
+}
+
+
+function renderWhatsappTable() {
+  const tbody =
+    document.getElementById("whatsappTableBody");
+
+  const searchInput =
+    document.getElementById("whatsappSearch");
+
+  const count =
+    document.getElementById("whatsappCount");
+
+  const summary =
+    document.getElementById("whatsappSummary");
+
+  const navCount =
+    document.getElementById("navWhatsappCount");
+
+  const pageInfo =
+    document.getElementById("whatsappPageInfo");
+
+  const prevButton =
+    document.getElementById("whatsappPrevPage");
+
+  const nextButton =
+    document.getElementById("whatsappNextPage");
+
+  if (!tbody) return;
+
+  const conversations =
+    state.whatsappConversations || [];
+
+  const search =
+    String(searchInput?.value || "")
+      .trim()
+      .toLowerCase();
+
+  const filtered = conversations.filter((item) => {
+    const searchable = [
+      item.contactName,
+      item.contactPhone,
+      item.chatId,
+      ...(item.contactNames || [])
+    ].join(" ").toLowerCase();
+
+    return searchable.includes(search);
+  });
+
+  const pageSize =
+    Number(state.whatsappPageSize) || 10;
+
+  const totalPages =
+    Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  state.whatsappPage =
+    Math.min(
+      Math.max(1, state.whatsappPage || 1),
+      totalPages
+    );
+
+  const start =
+    (state.whatsappPage - 1) * pageSize;
+
+  const pageRows =
+    filtered.slice(start, start + pageSize);
+
+  const formatDate = (value) => {
+    if (!value) return "—";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+
+    return new Intl.DateTimeFormat("en-SG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Singapore"
+    }).format(date);
+  };
+
+  // Use DOM textContent to display imported data safely.
+  const addCell = (row, value) => {
+    const cell = document.createElement("td");
+    cell.textContent = String(value ?? "");
+    row.appendChild(cell);
+  };
+
+  tbody.replaceChildren();
+
+  if (!pageRows.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+
+    cell.colSpan = 6;
+    cell.className = "empty-state";
+
+    cell.textContent = state.whatsappError
+      ? `Unable to load WhatsApp conversations: ${state.whatsappError}`
+      : "No WhatsApp conversations found.";
+
+    row.appendChild(cell);
+    tbody.appendChild(row);
+  }
+
+  for (const item of pageRows) {
+    const row = document.createElement("tr");
+
+    row.dataset.whatsappId = item.id;
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+
+    addCell(row, item.contactName || "Unknown contact");
+    addCell(row, item.contactPhone || "—");
+    addCell(row, item.messageCount ?? 0);
+    addCell(row, formatDate(item.firstMessageAt));
+    addCell(row, formatDate(item.lastMessageAt));
+    addCell(row, item.source || "WhatsApp");
+
+    tbody.appendChild(row);
+  }
+
+  if (count) count.textContent = filtered.length;
+
+  if (summary) {
+    summary.textContent =
+      `${conversations.length} conversations`;
+  }
+
+  if (navCount) {
+    navCount.textContent = conversations.length;
+  }
+
+  if (pageInfo) {
+    pageInfo.textContent =
+      `Page ${state.whatsappPage} of ${totalPages}`;
+  }
+
+  if (prevButton) {
+    prevButton.disabled = state.whatsappPage <= 1;
+  }
+
+  if (nextButton) {
+    nextButton.disabled =
+      state.whatsappPage >= totalPages;
+  }
+}
+
+
+function renderWhatsappDetail() {
+  const conversation =
+    state.whatsappConversations.find(
+      item => item.id === state.selectedWhatsappId
+    );
+
+  if (!conversation) return;
+
+  const hero =
+    document.getElementById("whatsappHero");
+
+  const chatContent =
+    document.getElementById("whatsappChatContent");
+
+  const fileRecord =
+    document.getElementById("whatsappFileRecord");
+
+  if (!hero || !chatContent || !fileRecord) return;
+
+  function formatDate(value) {
+    if (!value) return "—";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return new Intl.DateTimeFormat("en-SG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Singapore"
+    }).format(date);
+  }
+
+  function addInfo(container, label, value) {
+    const wrapper = document.createElement("div");
+    const labelElement = document.createElement("div");
+    const valueElement = document.createElement("div");
+
+    labelElement.className = "info-label";
+    labelElement.textContent = label;
+
+    valueElement.className = "info-value";
+    valueElement.textContent = String(value ?? "—");
+
+    wrapper.append(labelElement, valueElement);
+    container.appendChild(wrapper);
+  }
+
+  // Conversation heading
+  hero.replaceChildren();
+
+  const title = document.createElement("h1");
+  title.textContent =
+    conversation.contactName || "Unknown contact";
+
+  const subtitle = document.createElement("p");
+  subtitle.className = "hero-subtitle";
+  subtitle.textContent =
+    conversation.contactPhone ||
+    conversation.chatId;
+
+  const infoGrid = document.createElement("div");
+  infoGrid.className = "hero-grid";
+
+  addInfo(
+    infoGrid,
+    "Messages",
+    conversation.messageCount
+  );
+
+  addInfo(
+    infoGrid,
+    "First Message",
+    formatDate(conversation.firstMessageAt)
+  );
+
+  addInfo(
+    infoGrid,
+    "Last Message",
+    formatDate(conversation.lastMessageAt)
+  );
+
+  hero.append(title, subtitle, infoGrid);
+
+  // Conversation messages
+  chatContent.replaceChildren();
+
+  const messages = [...(conversation.messages || [])]
+    .sort((a, b) =>
+      new Date(a.timestamp).getTime() -
+      new Date(b.timestamp).getTime()
+    );
+
+  if (!messages.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent =
+      "No messages are available for this conversation.";
+
+    chatContent.appendChild(empty);
+  }
+
+  for (const message of messages) {
+    const direction = String(
+      message.direction || "incoming"
+    ).toLowerCase();
+
+    const wrapper = document.createElement("div");
+
+    wrapper.className =
+      "whatsapp-message " +
+      (direction === "outgoing"
+        ? "outgoing"
+        : direction === "system"
+          ? "system"
+          : "incoming");
+
+    const sender = document.createElement("div");
+    sender.className = "whatsapp-message-sender";
+    sender.textContent =
+      message.sender || "Unknown sender";
+
+    const body = document.createElement("div");
+    body.className = "whatsapp-message-body";
+    body.textContent = message.content || "";
+
+    const timestamp = document.createElement("div");
+    timestamp.className = "whatsapp-message-time";
+    timestamp.textContent =
+      formatDate(message.timestamp);
+
+    wrapper.append(sender, body, timestamp);
+    chatContent.appendChild(wrapper);
+  }
+
+  // Source information
+  fileRecord.replaceChildren();
+
+  addInfo(
+    fileRecord,
+    "Chat ID",
+    conversation.chatId
+  );
+
+  addInfo(
+    fileRecord,
+    "Contact Phone",
+    conversation.contactPhone || "Not available"
+  );
+
+  addInfo(
+    fileRecord,
+    "Contact Names",
+    conversation.contactNames.join(", ") || "Not available"
+  );
+
+  addInfo(
+    fileRecord,
+    "Source",
+    conversation.source
+  );
+
+  addInfo(
+    fileRecord,
+    "Last Synced",
+    formatDate(conversation.syncedAt)
+  );
 }
 
 async function refreshVeloxData() {
@@ -7393,6 +7843,104 @@ function bindEvents() {
       () => showView("velox")
     );
 
+
+  // WhatsApp Chats: return from detail to list
+  const whatsappBackButton =
+    document.getElementById("whatsappBackButton");
+
+  whatsappBackButton.addEventListener(
+    "click",
+    () => showView("whatsapp")
+  );
+
+  // ==========================================
+  // WHATSAPP CHATS — TABLE INTERACTIONS
+  // ==========================================
+
+  const whatsappSearch =
+    document.getElementById("whatsappSearch");
+
+  const whatsappTableBody =
+    document.getElementById("whatsappTableBody");
+
+  const whatsappPrevPage =
+    document.getElementById("whatsappPrevPage");
+
+  const whatsappNextPage =
+    document.getElementById("whatsappNextPage");
+
+  const whatsappPageSize =
+    document.getElementById("whatsappPageSize");
+
+  // Search conversations
+  whatsappSearch.addEventListener("input", () => {
+    state.whatsappPage = 1;
+    renderWhatsappTable();
+  });
+
+  // Open a conversation
+  function openWhatsappRow(row) {
+    if (!row) return;
+
+    const chatId = row.dataset.whatsappId;
+
+    const conversation =
+      state.whatsappConversations.find(
+        item => item.id === chatId
+      );
+
+    if (!conversation) return;
+
+    state.selectedWhatsappId = chatId;
+
+    renderWhatsappDetail();
+    showView("whatsapp-detail");
+  }
+
+  whatsappTableBody.addEventListener("click", (event) => {
+    openWhatsappRow(
+      event.target.closest("tr[data-whatsapp-id]")
+    );
+  });
+
+  whatsappTableBody.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    const row =
+      event.target.closest("tr[data-whatsapp-id]");
+
+    if (!row) return;
+
+    event.preventDefault();
+    openWhatsappRow(row);
+  });
+
+  // Previous page
+  whatsappPrevPage.addEventListener("click", () => {
+    if (state.whatsappPage <= 1) return;
+
+    state.whatsappPage--;
+    renderWhatsappTable();
+  });
+
+  // Next page
+  whatsappNextPage.addEventListener("click", () => {
+    state.whatsappPage++;
+    renderWhatsappTable();
+  });
+
+  // Conversations per page
+  whatsappPageSize.addEventListener("change", () => {
+    state.whatsappPageSize =
+      Number(whatsappPageSize.value) || 10;
+
+    state.whatsappPage = 1;
+    renderWhatsappTable();
+  });
+
+
   elements.veloxSearch
     .addEventListener(
       "input",
@@ -8893,12 +9441,49 @@ async function refreshDashboardData() {
   }
 }
 
+
+async function loadWhatsappConversations() {
+  state.whatsappLoading = true;
+  state.whatsappError = null;
+
+  try {
+    const conversations =
+      await fetchWhatsappConversations();
+
+    state.whatsappConversations =
+      conversations.sort((a, b) =>
+        new Date(b.lastMessageAt || 0).getTime() -
+        new Date(a.lastMessageAt || 0).getTime()
+      );
+
+    state.whatsappPage = 1;
+
+  } catch (error) {
+    console.error(
+      "WhatsApp conversations could not be loaded:",
+      error
+    );
+
+    state.whatsappError =
+      error.message || "Connection failed";
+
+    // Do not replace previously loaded data
+    // if a later refresh fails.
+
+  } finally {
+    state.whatsappLoading = false;
+    renderWhatsappTable();
+  }
+}
+
 async function initializeDashboard() {
   try {
     bindEvents();
 
     await refreshDashboardData();
     await refreshVeloxData();
+    loadWhatsappConversations();
+
     const params =
       new URLSearchParams(
         window.location.search
