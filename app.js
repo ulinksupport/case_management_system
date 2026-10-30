@@ -1427,13 +1427,48 @@ async function fetchWhatsappConversations() {
         lastMessageAt:
           String(item.last_message_at ?? "").trim(),
 
+
         source:
           String(item.source ?? "WhatsApp").trim(),
 
         messages,
 
         syncedAt:
-          String(item.synced_at ?? "").trim()
+          String(item.synced_at ?? "").trim(),
+
+        linkedMasterCase:
+          String(
+            item.linked_master_case ??
+            item.linkedMasterCase ??
+            ""
+          ).trim(),
+
+        linkedZohoTickets: (() => {
+          const value =
+            item.linked_zoho_tickets_json ??
+            item.linkedZohoTickets ??
+            [];
+
+          if (Array.isArray(value)) {
+            return value.map(String).filter(Boolean);
+          }
+
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed)
+              ? parsed.map(String).filter(Boolean)
+              : [];
+          } catch {
+            return [];
+          }
+        })(),
+
+        linkStatus:
+          String(item.link_status ?? "not_linked").trim(),
+
+        linkMethod:
+          String(item.link_method ?? "").trim()
+
       };
     });
   } finally {
@@ -3156,6 +3191,62 @@ function renderWhatsappDetail() {
     "Last Synced",
     formatDate(conversation.syncedAt)
   );
+
+  populateWhatsappCaseSelect();
+}
+
+function populateWhatsappCaseSelect(searchQuery = "") {
+  const select = document.getElementById(
+    "whatsappManualCaseSelect"
+  );
+
+  if (!select) return;
+
+  const query = searchQuery.trim().toLowerCase();
+
+  const matchingCases = state.cases
+    .filter(caseItem =>
+      !caseItem.isDummy && caseItem.zohoTicketId
+    )
+    .filter(caseItem => {
+      if (!query) return true;
+
+      const searchable = [
+        caseItem.id,
+        caseItem.patient,
+        caseItem.phone,
+        caseItem.email,
+        caseItem.zohoTicketId,
+        ...(caseItem.tickets || []).map(ticket => ticket.id)
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+
+  select.replaceChildren();
+
+  for (const caseItem of matchingCases) {
+    const option = document.createElement("option");
+
+    option.value = caseItem.id;
+    option.textContent = [
+      caseItem.id,
+      caseItem.patient,
+      caseItem.tickets?.[0]?.id
+    ].filter(Boolean).join(" · ");
+
+    select.appendChild(option);
+  }
+
+  if (matchingCases.length === 0) {
+    const option = document.createElement("option");
+    option.textContent = "No matching Zoho Cases";
+    option.disabled = true;
+    select.appendChild(option);
+  }
 }
 
 async function refreshVeloxData() {
@@ -7874,6 +7965,34 @@ function bindEvents() {
 
   const whatsappSearch =
     document.getElementById("whatsappSearch");
+
+  const whatsappManualCaseSearch = document.getElementById(
+    "whatsappManualCaseSearch"
+  );
+
+  whatsappManualCaseSearch?.addEventListener("input", (event) => {
+    populateWhatsappCaseSelect(event.target.value);
+  });
+
+
+  const whatsappManualCaseSelect = document.getElementById(
+    "whatsappManualCaseSelect"
+  );
+
+  const whatsappManualLinkButton = document.getElementById(
+    "whatsappManualLinkButton"
+  );
+
+  whatsappManualCaseSelect?.addEventListener("change", () => {
+    const selectedCases = Array.from(
+      whatsappManualCaseSelect.selectedOptions
+    ).filter(option => !option.disabled && option.value);
+
+    if (whatsappManualLinkButton) {
+      whatsappManualLinkButton.disabled =
+        selectedCases.length === 0;
+    }
+  });
 
   const whatsappTableBody =
     document.getElementById("whatsappTableBody");

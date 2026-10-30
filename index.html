@@ -459,13 +459,40 @@
                 </div>
 
                 <div class="record-list" id="whatsappFileRecord"></div>
+
+
+                <!-- WHATSAPP MANUAL CASE LINK -->
+                <div class="velox-manual-link" id="whatsappManualLink">
+
+                  <div class="velox-manual-link-title">
+                    Manual Case Link
+                  </div>
+
+                  <input id="whatsappManualCaseSearch" type="search"
+                    placeholder="Search case ID, ticket, name, phone or email..." />
+
+                  <div class="velox-case-select-label">
+                    Select Zoho Cases
+                  </div>
+
+                  <select id="whatsappManualCaseSelect" multiple size="6"></select>
+
+                  <div class="velox-case-select-help">
+                    Hold Ctrl and click to select multiple cases.
+                  </div>
+
+                  <button class="media-view-button" id="whatsappManualLinkButton" type="button" disabled>
+                    Link Selected Zoho Cases
+                  </button>
+
+                  <div id="whatsappManualLinkStatus" aria-live="polite"></div>
+                </div>
+
               </section>
             </aside>
 
           </div>
         </section>
-        <!-- END WHATSAPP CONVERSATION DETAIL -->
-
 
         <section class="view" id="view-velox-detail">
           <button class="back-button" id="veloxBackButton" type="button">
