@@ -2913,7 +2913,7 @@ function renderWhatsappTable() {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
 
-    cell.colSpan = 6;
+    cell.colSpan = 7;
     cell.className = "empty-state";
 
     cell.textContent = state.whatsappError
@@ -2931,12 +2931,27 @@ function renderWhatsappTable() {
     row.tabIndex = 0;
     row.setAttribute("role", "button");
 
+
     addCell(row, item.contactName || "Unknown contact");
     addCell(row, item.contactPhone || "—");
     addCell(row, item.messageCount ?? 0);
     addCell(row, formatDate(item.firstMessageAt));
     addCell(row, formatDate(item.lastMessageAt));
+
+    // Linked Record
+    const linkedRecords = Array.isArray(item.linkedZohoTickets)
+      ? item.linkedZohoTickets.filter(Boolean)
+      : [];
+
+    addCell(
+      row,
+      linkedRecords.length > 0
+        ? linkedRecords.join(", ")
+        : "Not Linked"
+    );
+
     addCell(row, item.source || "WhatsApp");
+
 
     tbody.appendChild(row);
   }
