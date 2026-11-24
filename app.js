@@ -17,6 +17,12 @@ const appConfig = {
     zohoTickets:
       "/webhook/zoho-tickets-feed",
 
+    zohoChildTickets:
+      "/webhook/cms2-child-tickets",
+
+    zohoUnreplied:
+      "/webhook/cms2-unreplied",
+
     zohoTicketDetail:
       "/webhook/zoho-ticket-detail",
 
@@ -1158,6 +1164,187 @@ async function fetchZohoSnapshot() {
   }
 }
 
+
+async function fetchChildTickets() {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    30000
+  );
+
+  try {
+    const response = await fetch(
+      buildApiUrl(appConfig.endpoints.zohoChildTickets),
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Child tickets returned HTTP ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+    const root = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (!root?.success || !Array.isArray(root.tickets)) {
+      throw new Error("Invalid Child Tickets response");
+    }
+
+    return root.tickets
+      .filter(ticket =>
+        String(ticket.associatedType || "")
+          .trim()
+          .toLowerCase() === "child"
+      )
+      .map(mapZohoTicketToCase);
+
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
+async function fetchUnrepliedTickets() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(
+      buildApiUrl(appConfig.endpoints.zohoUnreplied),
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Unreplied endpoint returned HTTP ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+    const root = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (!root?.success || !Array.isArray(root.tickets)) {
+      throw new Error("Invalid Unreplied response");
+    }
+
+    return root.tickets
+      .filter(ticket =>
+        ticket.needsReply === true &&
+        ticket.replyStateReady === true &&
+        String(ticket.statusType || ticket.status || "")
+          .trim().toLowerCase() !== "closed"
+      )
+      .map(mapZohoTicketToCase);
+
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function loadUnrepliedCasesOnDemand() {
+  if (state.unrepliedCasesLoading) return;
+
+  state.unrepliedCasesLoading = true;
+  state.unrepliedCasesError = "";
+
+  renderCaseTable();
+
+  try {
+    state.unrepliedCases = await fetchUnrepliedTickets();
+    state.unrepliedCasesLoaded = true;
+
+  } catch (error) {
+    state.unrepliedCasesError =
+      error?.message || "Unable to load Unreplied tickets";
+
+    console.error("Unreplied tickets error:", error);
+
+    showToast(
+      "Unable to load Unreplied tickets. Click Unreplied to retry."
+    );
+
+  } finally {
+    state.unrepliedCasesLoading = false;
+    renderCaseTable();
+  }
+}
+
+function mergeChildCases(parentCases) {
+  if (!state.childCasesLoaded) {
+    return parentCases;
+  }
+
+  const existingIds = new Set(
+    parentCases.map(item => item.zohoTicketId)
+  );
+
+  return parentCases.concat(
+    state.childCases.filter(
+      item => !existingIds.has(item.zohoTicketId)
+    )
+  );
+}
+
+async function loadChildCasesOnDemand() {
+  if (
+    state.childCasesLoaded ||
+    state.childCasesLoading
+  ) {
+    return;
+  }
+
+  state.childCasesLoading = true;
+  state.childCasesError = "";
+  renderCaseTable();
+
+  try {
+    const childCases = await fetchChildTickets();
+
+    state.childCases = childCases;
+    state.childCasesLoaded = true;
+
+    state.cases = mergeChildCases(
+      state.cases.filter(item =>
+        String(item.associatedType || "")
+          .trim()
+          .toLowerCase() !== "child"
+      )
+    );
+
+  } catch (error) {
+    state.childCasesError =
+      error?.message || "Unable to load Child tickets";
+
+    console.error("Child tickets error:", error);
+
+    showToast(
+      "Unable to load Child tickets. Click Child to retry."
+    );
+
+  } finally {
+    state.childCasesLoading = false;
+
+    if (state.relationshipFilter === "Child") {
+      renderCaseTable();
+    }
+  }
+}
+
 async function fetchVeloxTranscripts() {
   const controller = new AbortController();
 
@@ -1813,6 +2000,8 @@ const dataRepository = {
 
 const state = {
   cases: [],
+  zohoInitialLoading: true,
+  veloxInitialLoading: true,
   casePage: 1,
   casePageSize: 10,
 
@@ -1836,6 +2025,16 @@ const state = {
 
 
   relationshipFilter: "all",
+
+  unrepliedCases: [],
+  unrepliedCasesLoaded: false,
+  unrepliedCasesLoading: false,
+  unrepliedCasesError: "",
+
+  childCases: [],
+  childCasesLoaded: false,
+  childCasesLoading: false,
+  childCasesError: "",
 
   selectedCaseId: null,
   activeTimelineChannel: "all",
@@ -2195,22 +2394,38 @@ function renderDataSourceStatus() {
 }
 
 function renderKpis() {
-  const openCases = state.cases.filter((item) => item.status === "Open").length;
-  const interactionCount = state.cases.reduce((sum, item) => sum + item.interactions.length, 0);
-  const highMatches = state.cases.filter((item) => item.matchState === "high").length;
-  const ticketCount = state.cases.reduce((sum, item) => sum + item.tickets.length, 0);
+  const dashboardCases = state.cases.filter(item =>
+    String(item.associatedType || "")
+      .trim()
+      .toLowerCase() !== "child"
+  );
+
+  const openCases = dashboardCases.filter(
+    item => item.status === "Open"
+  ).length;
+
+  const interactionCount = dashboardCases.reduce(
+    (sum, item) => sum + item.interactions.length,
+    0
+  );
+
+  const ticketCount = dashboardCases.reduce(
+    (sum, item) => sum + item.tickets.length,
+    0
+  );
+
 
   const cards = [
-    { label: "Open Master Cases", value: openCases, foot: `Across ${ticketCount} linked tickets` },
-    { label: "Visible Interactions", value: interactionCount, foot: "Email · WhatsApp · Documents" },
     {
-      label: "High-confidence Cases",
-      value: highMatches,
-      foot: state.dataMode === "live"
-        ? "Calculated from live Zoho ticket fields"
-        : "Dummy grouping preview"
+      label: "Open Master Cases",
+      value: openCases,
+      foot: `Across ${ticketCount} linked tickets`
     },
-    { label: "Unmatched / Uncertain", value: state.unmatched.length, foot: "Visible for separate admin resolution" }
+    {
+      label: "Visible Interactions",
+      value: interactionCount,
+      foot: "Email · WhatsApp · Documents"
+    }
   ];
 
   elements.kpiGrid.innerHTML = cards.map((card) => `
@@ -2285,11 +2500,9 @@ async function markReplyHandled(
   }
 
   const caseItem =
-    state.cases.find(
+    [...state.unrepliedCases, ...state.cases].find(
       (item) =>
-        String(
-          item.zohoTicketId || ""
-        ).trim() ===
+        String(item.zohoTicketId || "").trim() ===
         normalizedTicketId
     );
 
@@ -2301,14 +2514,40 @@ async function markReplyHandled(
     caseItem.needsReply = false;
   }
 
+  // Remove the successfully handled email from Unreplied.
+  state.unrepliedCases = state.unrepliedCases.filter(item =>
+    !(
+      String(item.zohoTicketId || "").trim() === normalizedTicketId &&
+      String(item.latestIncomingEventId || "").trim() === normalizedEventId
+    )
+  );
+
   renderCaseTable();
 
   showToast(
     "Message marked as handled."
   );
+
 }
 
 function renderCaseTable() {
+
+  if (state.zohoInitialLoading) {
+    elements.caseCount.textContent = "Loading";
+
+    elements.caseTableBody.innerHTML = `
+      <tr>
+        <td colspan="8">
+          <div class="empty-state">
+            Loading Zoho Cases...
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
   const query = elements.caseSearch.value.trim().toLowerCase();
   const type = elements.caseTypeFilter.value;
   const match = elements.matchFilter.value;
@@ -2323,19 +2562,11 @@ function renderCaseTable() {
       !showPriority;
   }
 
-  const unrepliedCount =
-    state.cases.filter(
-      (item) =>
-        item.needsReply === true &&
-        item.replyStateReady === true &&
-        String(item.status ?? "")
-          .trim()
-          .toLowerCase() !== "closed"
-    ).length;
-
   if (elements.unrepliedCount) {
     elements.unrepliedCount.textContent =
-      unrepliedCount;
+      state.unrepliedCasesLoaded
+        ? String(state.unrepliedCases.length)
+        : "—";
   }
 
   const linkedZohoTicketIds =
@@ -2381,7 +2612,12 @@ function renderCaseTable() {
         .filter(Boolean)
     );
 
-  const filtered = state.cases.filter((item) => {
+  const visibleCases =
+    relationship === "unreplied"
+      ? state.unrepliedCases
+      : state.cases;
+
+  const filtered = visibleCases.filter((item) => {
     const searchable = [
       item.id,
       item.zohoTicketId,
@@ -2407,7 +2643,12 @@ function renderCaseTable() {
       && (type === "all" || item.caseType === type)
       && (match === "all" || item.matchState === match)
       && (
-        relationship === "all" ||
+        (
+          relationship === "all" &&
+          String(item.associatedType || "")
+            .trim()
+            .toLowerCase() !== "child"
+        ) ||
 
         (
           relationship === "Parent" &&
@@ -2421,7 +2662,9 @@ function renderCaseTable() {
 
         (
           relationship === "Child" &&
-          item.associatedType === "Child"
+          String(item.associatedType || "")
+            .trim()
+            .toLowerCase() === "child"
         ) ||
 
         (
@@ -2434,6 +2677,65 @@ function renderCaseTable() {
         )
       );
   });
+
+
+  if (
+    relationship === "unreplied" &&
+    (
+      state.unrepliedCasesLoading ||
+      (
+        !state.unrepliedCasesLoaded &&
+        !state.unrepliedCasesError
+      )
+    )
+  ) {
+    elements.caseCount.textContent = "Loading";
+
+    elements.caseTableBody.innerHTML =
+      '<tr><td colspan="8"><div class="empty-state">' +
+      'Loading Unreplied tickets...' +
+      '</div></td></tr>';
+
+    return;
+  }
+
+  if (
+    relationship === "unreplied" &&
+    state.unrepliedCasesError
+  ) {
+    elements.caseCount.textContent = "—";
+
+    elements.caseTableBody.innerHTML =
+      '<tr><td colspan="8"><div class="empty-state">' +
+      'Unable to load Unreplied tickets. Click Unreplied to retry.' +
+      '</div></td></tr>';
+
+    return;
+  }
+
+  if (
+    state.relationshipFilter === "Child" &&
+    state.childCasesLoading
+  ) {
+    elements.caseCount.textContent = "Loading";
+
+    elements.caseTableBody.innerHTML =
+      '<tr><td colspan="7"><div class="empty-state">Loading Child tickets...</div></td></tr>';
+
+    return;
+  }
+
+  if (
+    state.relationshipFilter === "Child" &&
+    state.childCasesError
+  ) {
+    elements.caseCount.textContent = "—";
+
+    elements.caseTableBody.innerHTML =
+      '<tr><td colspan="7"><div class="empty-state">Unable to load Child tickets. Click Child to retry.</div></td></tr>';
+
+    return;
+  }
 
   elements.caseCount.textContent = filtered.length;
 
@@ -2652,6 +2954,23 @@ function renderUnmatched() {
 }
 
 function renderVeloxTable() {
+
+  if (state.veloxInitialLoading) {
+    elements.veloxCount.textContent = "Loading";
+
+    elements.veloxTableBody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="empty-state">
+            Loading Velox Transcripts...
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
   const query =
     elements.veloxSearch
       .value
@@ -2881,6 +3200,25 @@ function renderWhatsappTable() {
     document.getElementById("whatsappNextPage");
 
   if (!tbody) return;
+
+
+  if (state.whatsappLoading &&
+    state.whatsappConversations.length === 0) {
+
+    if (count) count.textContent = "Loading";
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7">
+          <div class="empty-state">
+            Loading WhatsApp Chats...
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
 
   const conversations =
     state.whatsappConversations || [];
@@ -3257,6 +3595,8 @@ async function refreshVeloxData() {
     state.veloxTranscripts =
       transcripts;
 
+    state.veloxInitialLoading = false;
+
     renderVeloxTable();
     renderCaseTable();
 
@@ -3275,6 +3615,8 @@ async function refreshVeloxData() {
       }
     }
   } catch (error) {
+    state.veloxInitialLoading = false;
+
     console.error(
       "Velox transcript feed unavailable:",
       error
@@ -7593,9 +7935,10 @@ async function fetchAiCaseReport(ticketId) {
 
 
 async function openCase(caseId) {
-  const selectedCase = state.cases.find(
-    (item) => item.id === caseId
-  );
+  const selectedCase =
+    [...state.cases, ...state.unrepliedCases].find(
+      (item) => item.id === caseId
+    );
 
   if (!selectedCase) {
     showToast(
@@ -9350,14 +9693,25 @@ document
         state.casePage = 1;
 
         renderCaseTable();
+
+        if (state.relationshipFilter === "Child") {
+          loadChildCasesOnDemand();
+
+        } else if (state.relationshipFilter === "unreplied") {
+          loadUnrepliedCasesOnDemand();
+        }
       }
     );
 
   });
 
-
 function renderDashboard() {
-  elements.navCaseCount.textContent = state.cases.length;
+  elements.navCaseCount.textContent =
+    state.cases.filter(item =>
+      String(item.associatedType || "")
+        .trim()
+        .toLowerCase() !== "child"
+    ).length;
   elements.lastUpdatedText.textContent = state.generatedAt
     ? formatTicketDate(state.generatedAt)
     : formatCurrentTime();
@@ -9371,9 +9725,10 @@ function renderDashboard() {
   renderIngestion();
 
   if (state.selectedCaseId) {
-    const selectedCase = state.cases.find(
-      (item) => item.id === state.selectedCaseId
-    );
+    const selectedCase =
+      [...state.cases, ...state.unrepliedCases].find(
+        (item) => item.id === state.selectedCaseId
+      );
 
     if (selectedCase) {
       renderCaseDetail(selectedCase);
@@ -9517,7 +9872,7 @@ async function refreshDashboardData() {
     const previousScrollPosition =
       window.scrollY;
 
-    state.cases = snapshot.cases;
+    state.cases = mergeChildCases(snapshot.cases);
 
     // Restore any ticket details already retrieved
     // from the separate Zoho detail endpoint.
@@ -9572,6 +9927,11 @@ async function refreshDashboardData() {
     // because one background refresh failed.
   } finally {
     state.refreshInProgress = false;
+
+    if (state.zohoInitialLoading) {
+      state.zohoInitialLoading = false;
+      renderCaseTable();
+    }
   }
 }
 
@@ -9610,11 +9970,20 @@ async function loadWhatsappConversations() {
   }
 }
 
+
 async function initializeDashboard() {
   try {
     bindEvents();
 
+    // Show loading messages immediately.
+    renderCaseTable();
+    renderVeloxTable();
+
+    state.whatsappLoading = true;
+    renderWhatsappTable();
+
     await refreshDashboardData();
+
     await refreshVeloxData();
     loadWhatsappConversations();
 
