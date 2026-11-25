@@ -47,6 +47,9 @@ const appConfig = {
     whatsappChats:
       "/webhook/cms-whatsapp-chats-feed",
 
+    whatsappManualLink:
+      "/webhook/cms-whatsapp-manual-link",
+
     veloxManualLink:
       "/webhook/manually-link-case"
 
@@ -1614,9 +1617,23 @@ async function fetchWhatsappConversations() {
         lastMessageAt:
           String(item.last_message_at ?? "").trim(),
 
-
         source:
           String(item.source ?? "WhatsApp").trim(),
+
+        sourceZipNames: (() => {
+          try {
+            const value = item.source_zip_names_json ?? "[]";
+            const parsed = typeof value === "string"
+              ? JSON.parse(value)
+              : value;
+
+            return Array.isArray(parsed)
+              ? parsed.map(String).filter(Boolean)
+              : [];
+          } catch {
+            return [];
+          }
+        })(),
 
         messages,
 
@@ -3524,14 +3541,130 @@ function renderWhatsappDetail() {
     conversation.source
   );
 
+
   addInfo(
     fileRecord,
     "Last Synced",
     formatDate(conversation.syncedAt)
   );
 
+  // Linked Zoho tickets with individual Unlink buttons
+  const linkedSection = document.createElement("div");
+  linkedSection.className = "whatsapp-linked-cases";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Linked Zoho Cases";
+  linkedSection.appendChild(heading);
+
+  const linkedTickets = conversation.linkedZohoTickets || [];
+
+  if (!linkedTickets.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "Not linked";
+    linkedSection.appendChild(empty);
+  }
+
+  for (const ticketId of linkedTickets) {
+    const item = document.createElement("div");
+    item.style.cssText =
+      "display:flex;align-items:center;justify-content:space-between;" +
+      "gap:12px;margin:8px 0;flex-wrap:wrap;";
+
+
+    const ticketLabel = document.createElement("span");
+
+    const linkedCase = state.cases.find(
+      item =>
+        String(item.zohoTicketId || "").trim() ===
+        String(ticketId).trim()
+    );
+
+    const caseType = String(
+      linkedCase?.associatedType || "Unknown"
+    ).trim();
+
+    const caseNumber = linkedCase?.id || `Zoho Ticket ${ticketId}`;
+
+    const patientName = linkedCase?.patient || "";
+    const ulinkCaseId = linkedCase?.ulinkSgCaseId || "";
+
+    ticketLabel.style.cssText =
+      "display:flex;flex-direction:column;gap:4px;" +
+      "font-size:12px;min-width:0;";
+
+    const title = document.createElement("strong");
+    title.textContent = `${caseNumber} · ${caseType}`;
+
+    const details = document.createElement("span");
+    details.style.cssText =
+      "font-size:11px;color:#64748b;";
+
+    details.textContent = [
+      patientName,
+      ulinkCaseId && ulinkCaseId !== "-"
+        ? ulinkCaseId
+        : "",
+      `Ticket ID: ${ticketId}`
+    ].filter(Boolean).join(" · ");
+
+    ticketLabel.append(title, details);
+
+    const unlinkButton = document.createElement("button");
+    unlinkButton.type = "button";
+    unlinkButton.className = "media-view-button";
+    unlinkButton.textContent = "Unlink";
+
+    unlinkButton.addEventListener("click", async () => {
+      if (!confirm(`Unlink Zoho ticket ${ticketId}?`)) return;
+
+      unlinkButton.disabled = true;
+      unlinkButton.textContent = "Unlinking...";
+
+      try {
+        const response = await fetch(
+          buildApiUrl(appConfig.endpoints.whatsappManualLink),
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json"
+            },
+            body: JSON.stringify({
+              action: "unlink",
+              chat_id: conversation.chatId,
+              unlink_zoho_ticket: ticketId
+            })
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || result.success === false) {
+          throw new Error(
+            result.message || result.error || "Unlink failed."
+          );
+        }
+
+        await loadWhatsappConversations();
+        renderWhatsappDetail();
+
+      } catch (error) {
+        console.error("WhatsApp unlink failed:", error);
+        alert(error.message);
+        unlinkButton.disabled = false;
+        unlinkButton.textContent = "Unlink";
+      }
+    });
+
+    item.append(ticketLabel, unlinkButton);
+    linkedSection.appendChild(item);
+  }
+
+  fileRecord.appendChild(linkedSection);
+
   populateWhatsappCaseSelect();
 }
+
 
 function populateWhatsappCaseSelect(searchQuery = "") {
   const select = document.getElementById(
@@ -4914,6 +5047,49 @@ function renderCaseDetail(caseItem) {
 
     </div>
 
+
+    <div class="linked-velox-case-section">
+      <div class="info-label">
+        Linked WhatsApp Chats
+      </div>
+
+      <div class="linked-velox-list">
+        ${state.whatsappConversations
+      .filter(chat =>
+        (chat.linkedZohoTickets || []).includes(
+          String(caseItem.zohoTicketId || "").trim()
+        )
+      )
+      .map(chat => `
+            <div class="linked-velox-row">
+              <div class="linked-velox-info">
+                <div class="linked-velox-name">
+                  ${escapeHtml(chat.contactName || chat.chatId)}
+                </div>
+                <div class="linked-velox-meta">
+                  ${escapeHtml(chat.contactPhone || "")}
+                  · ${chat.messageCount} messages
+                  · ${escapeHtml(chat.linkMethod || "auto")}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="media-view-button case-whatsapp-unlink-button"
+                data-chat-id="${escapeHtml(chat.chatId)}"
+                data-zoho-ticket-id="${escapeHtml(caseItem.zohoTicketId || "")}"
+              >
+                Unlink
+              </button>
+            </div>
+          `)
+      .join("") || `
+            <div class="secondary-text">
+              No linked WhatsApp chats
+            </div>
+          `}
+      </div>
+    </div>
+
     <div class="hero-grid">
       <div><div class="info-label">Client</div><div class="info-value">${escapeHtml(caseItem.client)}</div></div>
       <div><div class="info-label">Patient Phone</div><div class="info-value">${escapeHtml(caseItem.phone)}</div></div>
@@ -5157,6 +5333,78 @@ function renderCaseDetail(caseItem) {
     </button>
   </div>
 `;
+
+
+  // Zoho Case -> WhatsApp manual linking
+  const currentZohoTicketId =
+    String(caseItem.zohoTicketId || "").trim();
+
+  const availableWhatsappOptions =
+    state.whatsappConversations
+      .filter(chat =>
+        chat.chatId &&
+        !(chat.linkedZohoTickets || []).includes(
+          currentZohoTicketId
+        )
+      )
+      .map(chat => {
+        const name = chat.contactName || "Unknown contact";
+        const phone = chat.contactPhone || "";
+        const label = [
+          name,
+          phone,
+          `${chat.messageCount || 0} messages`
+        ].filter(Boolean).join(" · ");
+
+        return `
+          <option
+            value="${escapeHtml(chat.chatId)}"
+            data-search="${escapeHtml(
+          [name, phone, chat.chatId]
+            .join(" ")
+            .toLowerCase()
+        )}"
+          >
+            ${escapeHtml(label)}
+          </option>
+        `;
+      })
+      .join("");
+
+  elements.caseRecord.innerHTML += `
+    <div class="velox-manual-link">
+      <div class="velox-manual-link-title">
+        Link WhatsApp Chats
+      </div>
+
+      <input
+        id="caseManualWhatsappSearch"
+        type="search"
+        placeholder="Search WhatsApp name or phone..."
+      />
+
+      <select
+        id="caseManualWhatsappSelect"
+        multiple
+        size="6"
+      >
+        ${availableWhatsappOptions}
+      </select>
+
+      <div class="velox-case-select-help">
+        Hold Ctrl and click to select multiple chats.
+      </div>
+
+      <button
+        class="media-view-button"
+        id="caseManualWhatsappLinkButton"
+        type="button"
+        data-zoho-ticket-id="${escapeHtml(currentZohoTicketId)}"
+      >
+        Link Selected WhatsApp Chats
+      </button>
+    </div>
+  `;
 
   const restoredVeloxSearch =
     document.getElementById(
@@ -6188,6 +6436,166 @@ async function navigateToChronologySource(
   );
 }
 
+
+function renderWhatsappTimeline(caseItem) {
+  const ticketId = String(
+    caseItem.zohoTicketId || ""
+  ).trim();
+
+  const linkedChats = state.whatsappConversations.filter(
+    chat =>
+      (chat.linkedZohoTickets || [])
+        .map(String)
+        .includes(ticketId)
+  );
+
+  elements.timelineContainer.classList.remove(
+    "master-chronology-mode"
+  );
+
+  const totalMessages = linkedChats.reduce(
+    (total, chat) =>
+      total + (chat.messages || []).length,
+    0
+  );
+
+  elements.timelineCount.textContent = totalMessages;
+
+  if (!linkedChats.length) {
+    elements.timelineContainer.innerHTML = `
+      <div class="empty-state">
+        No linked WhatsApp conversations found.
+      </div>
+    `;
+    return;
+  }
+
+  elements.timelineContainer.innerHTML =
+    linkedChats.map((chat, index) => {
+      const fileName =
+        chat.sourceZipNames?.[0] ||
+        `WhatsApp Chat - ${chat.contactPhone || chat.chatId}.zip`;
+
+      const interactions = [...(chat.messages || [])]
+        .sort((a, b) =>
+          new Date(a.timestamp).getTime() -
+          new Date(b.timestamp).getTime()
+        )
+        .map((message, messageIndex) => ({
+          id: `${chat.chatId}-${messageIndex}`,
+          channel: "whatsapp",
+          party: message.sender || "Unknown sender",
+          time: formatTicketDate(message.timestamp),
+          timestamp: message.timestamp,
+          source: fileName,
+          title:
+            message.direction === "outgoing"
+              ? "Outgoing WhatsApp message"
+              : message.direction === "system"
+                ? "WhatsApp system message"
+                : "Incoming WhatsApp message",
+          content: message.content || "",
+          attachments: []
+        }));
+
+      return `
+        <details
+          class="timeline-ticket-group"
+          ${index === 0 ? "open" : ""}
+        >
+          <summary>
+            <span>
+              ${escapeHtml(
+        chat.contactName || chat.contactPhone || chat.chatId
+      )}
+              · ${escapeHtml(fileName)}
+            </span>
+
+            <span class="timeline-group-count">
+              ${interactions.length} messages
+            </span>
+          </summary>
+
+          <div class="timeline-ticket-group-content">
+            <div class="secondary-text">
+              ${escapeHtml(chat.contactPhone || "")}
+              · ${escapeHtml(chat.linkMethod || "auto")}
+              link
+            </div>
+            
+            <div style="
+              display:flex;
+              flex-direction:column;
+              gap:12px;
+              padding:14px;
+              background:#f4f7fa;
+              border-radius:10px;
+            ">
+              ${interactions.map(item => {
+        const direction =
+          item.title.startsWith("Outgoing") ? "outgoing" :
+            item.title.startsWith("WhatsApp system") ? "system" :
+              "incoming";
+
+        const isOutgoing = direction === "outgoing";
+        const isSystem = direction === "system";
+
+        return `
+                  <div style="
+                    display:flex;
+                    justify-content:${isSystem ? "center" :
+            isOutgoing ? "flex-end" : "flex-start"
+          };
+                    width:100%;
+                  ">
+                    <div style="
+                      max-width:85%;
+                      min-width:0;
+                      padding:10px 12px;
+                      border-radius:10px;
+                      background:${isSystem ? "#e8edf2" :
+            isOutgoing ? "#e4f6ed" : "#ffffff"
+          };
+                      border:1px solid ${isSystem ? "#d8e0e8" :
+            isOutgoing ? "#c8e8d8" : "#dce4ed"
+          };
+                      overflow-wrap:anywhere;
+                    ">
+                      <div style="
+                        font-weight:600;
+                        font-size:12px;
+                        margin-bottom:6px;
+                      ">
+                        ${escapeHtml(item.party)}
+                      </div>
+
+                      <div style="
+                        font-size:12px;
+                        line-height:1.6;
+                        white-space:pre-wrap;
+                        overflow-wrap:anywhere;
+                      ">${escapeHtml(item.content)}</div>
+
+                      <div style="
+                        font-size:10px;
+                        color:#64748b;
+                        text-align:right;
+                        margin-top:8px;
+                      ">
+                        ${escapeHtml(item.time)}
+                      </div>
+                    </div>
+                  </div>
+                `;
+      }).join("")}
+            </div>
+
+          </div>
+        </details>
+      `;
+    }).join("");
+}
+
 function renderTimeline(caseItem) {
   const isChild =
     String(
@@ -6226,17 +6634,17 @@ function renderTimeline(caseItem) {
     "master-chronology-mode"
   );
 
-  if (
-    state.activeTimelineChannel === "email" ||
-    state.activeTimelineChannel === "whatsapp"
-  ) {
-    renderGroupedTicketTimeline(
-      caseItem,
-      state.activeTimelineChannel
-    );
 
+  if (state.activeTimelineChannel === "whatsapp") {
+    renderWhatsappTimeline(caseItem);
     return;
   }
+
+  if (state.activeTimelineChannel === "email") {
+    renderGroupedTicketTimeline(caseItem, "email");
+    return;
+  }
+
 
   if (
     state.activeTimelineChannel === "velox"
@@ -8337,6 +8745,91 @@ function bindEvents() {
     }
   });
 
+  whatsappManualLinkButton?.addEventListener("click", async () => {
+    const chatId = state.selectedWhatsappId;
+    const statusElement = document.getElementById(
+      "whatsappManualLinkStatus"
+    );
+
+    const selectedCaseIds = Array.from(
+      whatsappManualCaseSelect.selectedOptions
+    )
+      .filter(option => !option.disabled && option.value)
+      .map(option => option.value);
+
+    const ticketIds = [
+      ...new Set(
+        selectedCaseIds
+          .map(caseId =>
+            state.cases.find(item => item.id === caseId)
+          )
+          .map(caseItem => String(
+            caseItem?.zohoTicketId || ""
+          ).trim())
+          .filter(Boolean)
+      )
+    ];
+
+    if (!chatId || ticketIds.length !== selectedCaseIds.length) {
+      if (statusElement) {
+        statusElement.textContent =
+          "Please select valid Zoho Cases.";
+      }
+      return;
+    }
+
+    whatsappManualLinkButton.disabled = true;
+
+    if (statusElement) {
+      statusElement.textContent = "Saving links...";
+    }
+
+    try {
+      const response = await fetch(
+        buildApiUrl(appConfig.endpoints.whatsappManualLink),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            action: "link",
+            chat_id: chatId,
+            linked_zoho_tickets_json: ticketIds
+          })
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || result.success === false) {
+        throw new Error(
+          result.message || result.error || "Link failed."
+        );
+      }
+
+      if (statusElement) {
+        statusElement.textContent =
+          "Zoho Cases linked successfully.";
+      }
+
+      await loadWhatsappConversations();
+      renderWhatsappDetail();
+
+    } catch (error) {
+      console.error("WhatsApp manual link failed:", error);
+
+      if (statusElement) {
+        statusElement.textContent = error.message;
+      }
+
+    } finally {
+      whatsappManualLinkButton.disabled = false;
+    }
+  });
+
+
   const whatsappTableBody =
     document.getElementById("whatsappTableBody");
 
@@ -8715,6 +9208,116 @@ function bindEvents() {
     "click",
     async (event) => {
 
+
+      const caseWhatsappLinkButton =
+        event.target.closest(
+          "#caseManualWhatsappLinkButton"
+        );
+
+      if (caseWhatsappLinkButton) {
+        const select = document.getElementById(
+          "caseManualWhatsappSelect"
+        );
+
+        const selectedChatIds = Array.from(
+          select?.selectedOptions || []
+        )
+          .map(option => String(option.value || "").trim())
+          .filter(Boolean);
+
+        const ticketId = String(
+          caseWhatsappLinkButton.dataset.zohoTicketId || ""
+        ).trim();
+
+        if (!selectedChatIds.length || !ticketId) {
+          showToast(
+            "Select at least one WhatsApp chat."
+          );
+          return;
+        }
+
+        caseWhatsappLinkButton.disabled = true;
+        caseWhatsappLinkButton.textContent = "Linking...";
+
+        let linkedCount = 0;
+
+        try {
+          for (const chatId of selectedChatIds) {
+            const response = await fetch(
+              buildApiUrl(
+                appConfig.endpoints.whatsappManualLink
+              ),
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json"
+                },
+                body: JSON.stringify({
+                  action: "link",
+                  chat_id: chatId,
+                  linked_zoho_tickets_json: [ticketId]
+                })
+              }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || result.success === false) {
+              throw new Error(
+                result.message ||
+                result.error ||
+                "Unable to link WhatsApp chat."
+              );
+            }
+
+            linkedCount++;
+          }
+
+          await loadWhatsappConversations();
+
+          const selectedCase = state.cases.find(
+            item => item.id === state.selectedCaseId
+          );
+
+          if (selectedCase) {
+            renderCaseDetail(selectedCase);
+          }
+
+          showToast(
+            `${linkedCount} WhatsApp chat(s) linked successfully.`
+          );
+
+        } catch (error) {
+          console.error(
+            "WhatsApp linking failed:",
+            error
+          );
+
+          // Refresh even if some links succeeded before an error.
+          await loadWhatsappConversations();
+
+          const selectedCase = state.cases.find(
+            item => item.id === state.selectedCaseId
+          );
+
+          if (selectedCase) {
+            renderCaseDetail(selectedCase);
+          }
+
+          showToast(
+            `${linkedCount} linked. ${error.message}`
+          );
+
+        } finally {
+          caseWhatsappLinkButton.disabled = false;
+          caseWhatsappLinkButton.textContent =
+            "Link Selected WhatsApp Chats";
+        }
+
+        return;
+      }
+
       const caseVeloxLinkButton =
         event.target.closest(
           "#caseManualVeloxLinkButton"
@@ -9025,6 +9628,78 @@ function bindEvents() {
         return;
       }
 
+
+      const caseWhatsappUnlinkButton =
+        event.target.closest(
+          ".case-whatsapp-unlink-button"
+        );
+
+      if (caseWhatsappUnlinkButton) {
+        const chatId =
+          caseWhatsappUnlinkButton.dataset.chatId;
+
+        const ticketId =
+          caseWhatsappUnlinkButton.dataset.zohoTicketId;
+
+        if (!chatId || !ticketId) {
+          showToast("Unable to identify WhatsApp link.");
+          return;
+        }
+
+        if (!confirm("Unlink this WhatsApp chat from this Zoho ticket?")) {
+          return;
+        }
+
+        caseWhatsappUnlinkButton.disabled = true;
+        caseWhatsappUnlinkButton.textContent = "Unlinking...";
+
+        try {
+          const response = await fetch(
+            buildApiUrl(appConfig.endpoints.whatsappManualLink),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json"
+              },
+              body: JSON.stringify({
+                action: "unlink",
+                chat_id: chatId,
+                unlink_zoho_ticket: ticketId
+              })
+            }
+          );
+
+          const result = await response.json();
+
+          if (!response.ok || result.success === false) {
+            throw new Error(
+              result.message || result.error || "Unlink failed."
+            );
+          }
+
+          await loadWhatsappConversations();
+
+          const selectedCase = state.cases.find(
+            item => item.id === state.selectedCaseId
+          );
+
+          if (selectedCase) {
+            renderCaseDetail(selectedCase);
+          }
+
+          showToast("WhatsApp chat unlinked successfully.");
+
+        } catch (error) {
+          console.error("WhatsApp case unlink failed:", error);
+          showToast("Unable to unlink WhatsApp chat.");
+
+          caseWhatsappUnlinkButton.disabled = false;
+          caseWhatsappUnlinkButton.textContent = "Unlink";
+        }
+
+        return;
+      }
 
       const caseVeloxUnlinkButton =
         event.target.closest(
@@ -9997,17 +10672,36 @@ async function initializeDashboard() {
         params.get("openTicket") || ""
       ).trim();
 
+
     if (openTicketId) {
-      const matchingCase =
-        state.cases.find(
-          (item) =>
+      const findOpenedCase = () =>
+        [...state.cases, ...state.unrepliedCases].find(
+          item =>
             String(item.zohoTicketId || "").trim() ===
             openTicketId
         );
 
+      let matchingCase = findOpenedCase();
+
+      // Child tickets load separately from Parent tickets.
+      if (!matchingCase) {
+        await loadChildCasesOnDemand();
+        matchingCase = findOpenedCase();
+      }
+
+      // Also support cases opened from Unreplied.
+      if (!matchingCase) {
+        await loadUnrepliedCasesOnDemand();
+        matchingCase = findOpenedCase();
+      }
 
       if (matchingCase) {
         await openCase(matchingCase.id);
+      } else {
+        console.warn(
+          "Previously opened Zoho ticket could not be restored:",
+          openTicketId
+        );
       }
     }
 
