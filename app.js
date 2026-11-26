@@ -38,6 +38,9 @@ const appConfig = {
     aiCaseGuidanceResolve:
       "/webhook/cms-ai-guidance-resolve",
 
+    aiOpsReviewSave:
+      "/webhook/cms-ai-ops-review-save",
+
     aiMasterChronology:
       "/webhook/ai-master-chronology",
 
@@ -10221,32 +10224,150 @@ function bindEvents() {
           "#saveCaseKnowledgeBaseButton"
         );
 
+
       if (
         saveKnowledgeBaseButton ||
         saveCaseKnowledgeBaseButton
       ) {
+        const reviewInput =
+          document.getElementById("opsReviewInput");
+
         const review =
-          document
-            .getElementById("opsReviewInput")
-            ?.value
-            .trim() || "";
+          reviewInput?.value.trim() || "";
 
         if (!review) {
-          showToast(
-            "Please enter an Ops review first."
-          );
-
+          showToast("Please enter an Ops review first.");
           return;
         }
 
-        if (saveKnowledgeBaseButton) {
-          showToast(
-            "Save to Knowledge Base will be connected to the backend later."
+        const selectedCase =
+          state.cases.find(
+            item => item.id === state.selectedCaseId
           );
-        } else {
-          showToast(
-            "Save to Case-specific Knowledge Base will be connected to the backend later."
+
+        if (!selectedCase?.zohoTicketId) {
+          showToast("No valid case is selected.");
+          return;
+        }
+
+        const ticketId =
+          String(selectedCase.zohoTicketId).trim();
+
+        const guidance =
+          state.aiCaseGuidance.get(ticketId);
+
+        const knowledgeType =
+          saveKnowledgeBaseButton
+            ? "general"
+            : "case_specific";
+
+        const clickedButton =
+          saveKnowledgeBaseButton ||
+          saveCaseKnowledgeBaseButton;
+
+        const buttons = [
+          saveKnowledgeBaseButton,
+          saveCaseKnowledgeBaseButton
+        ].filter(Boolean);
+
+        const originalText =
+          clickedButton.textContent;
+
+        const caseTicketIds = [
+          ticketId,
+          ...(selectedCase.relatedTickets || [])
+            .map(item => String(item.ticketId || "").trim())
+            .filter(Boolean)
+        ];
+
+        const uniqueTicketIds =
+          [...new Set(caseTicketIds)];
+
+        const payload = {
+          feedbackText: review,
+          knowledgeType,
+          submittedBy: "Ops User",
+          caseIdentifier:
+            guidance?.caseIdentifier ||
+            selectedCase.ulinkSgCaseId ||
+            "",
+          ticketId,
+          suggestionKey:
+            guidance?.suggestionKey ||
+            `zoho_ticket:${ticketId}`,
+          caseTicketIds: uniqueTicketIds
+        };
+
+        buttons.forEach(button => {
+          button.disabled = true;
+        });
+
+        const confirmationMessage =
+          knowledgeType === "general"
+            ? "Are you sure you want to save this Ops review to the General Knowledge Base?"
+            : "Are you sure you want to save this Ops review to the Case-Specific Knowledge Base?";
+
+        const confirmed = window.confirm(confirmationMessage);
+
+        if (!confirmed) {
+          clickedButton.disabled = false;
+          return;
+        }
+
+        clickedButton.textContent = "Saving...";
+
+        try {
+          const response = await fetch(
+            buildApiUrl(
+              appConfig.endpoints.aiOpsReviewSave
+            ),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              body: JSON.stringify(payload)
+            }
           );
+
+          if (!response.ok) {
+            throw new Error(
+              `Save failed: HTTP ${response.status}`
+            );
+          }
+
+          const result = await response.json();
+
+          if (result.success !== true) {
+            throw new Error(
+              result.message || "Unable to save review."
+            );
+          }
+
+          if (reviewInput) {
+            reviewInput.value = "";
+          }
+
+          showToast(
+            knowledgeType === "general"
+              ? "Saved to General Knowledge Base."
+              : "Saved to Case-Specific Knowledge Base."
+          );
+
+        } catch (error) {
+          console.error("Ops Review save failed:", error);
+
+          showToast(
+            "Unable to save Ops review. Please try again."
+          );
+
+        } finally {
+          buttons.forEach(button => {
+            button.disabled = false;
+          });
+
+          clickedButton.textContent = originalText;
         }
 
         return;
