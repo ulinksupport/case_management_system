@@ -2466,6 +2466,71 @@ tr[data-velox-id] .secondary-text {
 }
 
 
+/* Ops Review - Client Selection Ai Case Suggestion*/
+
+.ops-client-selection {
+  margin: 14px 0;
+}
+
+.ops-client-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  margin-bottom: 8px;
+}
+
+.ops-client-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.ops-client-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.ops-client-option span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid #cbe3ed;
+  border-radius: 8px;
+  background: #f5fafc;
+  color: #126f92;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ops-client-option:hover span {
+  background: #e8f5f9;
+  border-color: #126f92;
+}
+
+.ops-client-option input:checked+span {
+  background: #126f92;
+  border-color: #126f92;
+  color: #ffffff;
+}
+
+.ops-client-option input:focus-visible+span {
+  outline: 3px solid rgba(18, 111, 146, 0.3);
+  outline-offset: 2px;
+}
+
+.ops-client-option input:disabled+span {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
 /* ==========================================
    WHATSAPP CHATS — READ-ONLY VIEW
    ========================================== */

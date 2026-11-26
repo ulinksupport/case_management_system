@@ -12,6 +12,21 @@ const apiBaseUrl =
     ?.content.trim()
     .replace(/\/+$/, "") ?? "";
 
+const CLIENT_KNOWLEDGE_LIST = [
+  {
+    id: "singlife_gi",
+    name: "Singlife GI"
+  },
+  {
+    id: "singlife_ipmi",
+    name: "Singlife IPMI"
+  },
+  {
+    id: "etiqa",
+    name: "Etiqa"
+  }
+];
+
 const appConfig = {
   endpoints: {
     zohoTickets:
@@ -8126,6 +8141,29 @@ function renderAiCaseGuidance(caseItem) {
         rows="5"
       ></textarea>
 
+      <div class="ops-client-selection">
+        <div class="ai-label">
+          Select Client(s)
+        </div>
+
+        <div class="ops-client-options">
+          ${CLIENT_KNOWLEDGE_LIST.map(client => `
+            <label class="ops-client-option">
+              <input
+                type="checkbox"
+                name="opsClient"
+                value="${escapeHtml(client.id)}"
+              >
+              <span>${escapeHtml(client.name)}</span>
+            </label>
+          `).join("")}
+        </div>
+
+        <div class="ops-review-help">
+          Select one or more clients when saving to Client Knowledge Base.
+        </div>
+      </div>
+
       <div class="ops-review-actions">
 
         <button
@@ -8142,6 +8180,15 @@ function renderAiCaseGuidance(caseItem) {
           id="saveCaseKnowledgeBaseButton"
         >
           Save to Case-specific Knowledge Base
+        </button>
+
+        <button
+          type="button"
+          class="ops-review-button secondary"
+          id="saveClientKnowledgeBaseButton"
+          data-ai-save-client-kb
+        >
+          Save to Client Knowledge Base
         </button>
 
       </div>
@@ -10427,64 +10474,73 @@ function bindEvents() {
         if (selectedCase) renderTimeline(selectedCase);
       }
 
+
       const saveKnowledgeBaseButton =
-        event.target.closest(
-          "#saveKnowledgeBaseButton"
-        );
+        event.target.closest("#saveKnowledgeBaseButton");
 
       const saveCaseKnowledgeBaseButton =
-        event.target.closest(
-          "#saveCaseKnowledgeBaseButton"
-        );
+        event.target.closest("#saveCaseKnowledgeBaseButton");
 
+      const saveClientKnowledgeBaseButton =
+        event.target.closest("#saveClientKnowledgeBaseButton");
 
       if (
         saveKnowledgeBaseButton ||
-        saveCaseKnowledgeBaseButton
+        saveCaseKnowledgeBaseButton ||
+        saveClientKnowledgeBaseButton
       ) {
         const reviewInput =
           document.getElementById("opsReviewInput");
 
-        const review =
-          reviewInput?.value.trim() || "";
+        const review = reviewInput?.value.trim() || "";
 
         if (!review) {
           showToast("Please enter an Ops review first.");
           return;
         }
 
-        const selectedCase =
-          state.cases.find(
-            item => item.id === state.selectedCaseId
-          );
+        const selectedCase = state.cases.find(
+          item => item.id === state.selectedCaseId
+        );
 
         if (!selectedCase?.zohoTicketId) {
           showToast("No valid case is selected.");
           return;
         }
 
-        const ticketId =
-          String(selectedCase.zohoTicketId).trim();
+        const ticketId = String(selectedCase.zohoTicketId).trim();
+        const guidance = state.aiCaseGuidance.get(ticketId);
 
-        const guidance =
-          state.aiCaseGuidance.get(ticketId);
+        const knowledgeType = saveClientKnowledgeBaseButton
+          ? "client_specific"
+          : saveCaseKnowledgeBaseButton
+            ? "case_specific"
+            : "general";
 
-        const knowledgeType =
-          saveKnowledgeBaseButton
-            ? "general"
-            : "case_specific";
+        const selectedClientIds = [
+          ...document.querySelectorAll(
+            '.ops-client-option input[name="opsClient"]:checked'
+          )
+        ].map(input => input.value);
+
+        if (
+          knowledgeType === "client_specific" &&
+          selectedClientIds.length === 0
+        ) {
+          showToast("Please select at least one client.");
+          return;
+        }
+
+        const selectedClientNames = CLIENT_KNOWLEDGE_LIST
+          .filter(client => selectedClientIds.includes(client.id))
+          .map(client => client.name);
 
         const clickedButton =
           saveKnowledgeBaseButton ||
-          saveCaseKnowledgeBaseButton;
+          saveCaseKnowledgeBaseButton ||
+          saveClientKnowledgeBaseButton;
 
-        const buttons = [
-          saveKnowledgeBaseButton,
-          saveCaseKnowledgeBaseButton
-        ].filter(Boolean);
-
-        const originalText =
-          clickedButton.textContent;
+        const originalText = clickedButton.textContent;
 
         const caseTicketIds = [
           ticketId,
@@ -10492,9 +10548,6 @@ function bindEvents() {
             .map(item => String(item.ticketId || "").trim())
             .filter(Boolean)
         ];
-
-        const uniqueTicketIds =
-          [...new Set(caseTicketIds)];
 
         const payload = {
           feedbackText: review,
@@ -10508,32 +10561,47 @@ function bindEvents() {
           suggestionKey:
             guidance?.suggestionKey ||
             `zoho_ticket:${ticketId}`,
-          caseTicketIds: uniqueTicketIds
+          caseTicketIds: [...new Set(caseTicketIds)],
+          clientIds:
+            knowledgeType === "client_specific"
+              ? selectedClientIds
+              : []
         };
+
+        const destination = {
+          general: "General Knowledge Base",
+          case_specific: "Case-Specific Knowledge Base",
+          client_specific: "Client Knowledge Base"
+        }[knowledgeType];
+
+        const clientDetails =
+          knowledgeType === "client_specific"
+            ? `\n\nSelected clients: ${selectedClientNames.join(", ")}`
+            : "";
+
+        const confirmed = window.confirm(
+          `Are you sure you want to save this Ops review to the ${destination}?${clientDetails}`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        const buttons = [
+          document.getElementById("saveKnowledgeBaseButton"),
+          document.getElementById("saveCaseKnowledgeBaseButton"),
+          document.getElementById("saveClientKnowledgeBaseButton")
+        ].filter(Boolean);
 
         buttons.forEach(button => {
           button.disabled = true;
         });
 
-        const confirmationMessage =
-          knowledgeType === "general"
-            ? "Are you sure you want to save this Ops review to the General Knowledge Base?"
-            : "Are you sure you want to save this Ops review to the Case-Specific Knowledge Base?";
-
-        const confirmed = window.confirm(confirmationMessage);
-
-        if (!confirmed) {
-          clickedButton.disabled = false;
-          return;
-        }
-
         clickedButton.textContent = "Saving...";
 
         try {
           const response = await fetch(
-            buildApiUrl(
-              appConfig.endpoints.aiOpsReviewSave
-            ),
+            buildApiUrl(appConfig.endpoints.aiOpsReviewSave),
             {
               method: "POST",
               headers: {
@@ -10545,9 +10613,7 @@ function bindEvents() {
           );
 
           if (!response.ok) {
-            throw new Error(
-              `Save failed: HTTP ${response.status}`
-            );
+            throw new Error(`Save failed: HTTP ${response.status}`);
           }
 
           const result = await response.json();
@@ -10558,22 +10624,21 @@ function bindEvents() {
             );
           }
 
-          if (reviewInput) {
-            reviewInput.value = "";
+          reviewInput.value = "";
+
+          if (knowledgeType === "client_specific") {
+            document.querySelectorAll(
+              '.ops-client-option input[name="opsClient"]'
+            ).forEach(input => {
+              input.checked = false;
+            });
           }
 
-          showToast(
-            knowledgeType === "general"
-              ? "Saved to General Knowledge Base."
-              : "Saved to Case-Specific Knowledge Base."
-          );
+          showToast(`Saved to ${destination}.`);
 
         } catch (error) {
           console.error("Ops Review save failed:", error);
-
-          showToast(
-            "Unable to save Ops review. Please try again."
-          );
+          showToast("Unable to save Ops review. Please try again.");
 
         } finally {
           buttons.forEach(button => {
