@@ -41,6 +41,9 @@ const appConfig = {
     aiOpsReviewSave:
       "/webhook/cms-ai-ops-review-save",
 
+    aiDraftReply:
+      "/webhook/cms-ai-draft-reply",
+
     aiMasterChronology:
       "/webhook/ai-master-chronology",
 
@@ -7958,10 +7961,21 @@ function renderAiCaseGuidance(caseItem) {
               data-dismissed-action="${escapeHtml(
             step.action || ""
           )}"
+            
             >
               Resolved / Not required
             </button>
+
+            <button
+              type="button"
+              class="media-view-button ai-draft-reply-button"
+              data-ai-draft-reply
+              data-step-index="${nextSteps.indexOf(step)}"
+            >
+              Draft Reply
+            </button>
           </div>
+
 
           </div>
         `)
@@ -9796,6 +9810,205 @@ function bindEvents() {
             isExpanded
               ? "Show less"
               : "Read more";
+        }
+
+        return;
+      }
+
+
+      const draftReplyButton =
+        event.target.closest(
+          "[data-ai-draft-reply]"
+        );
+
+      if (draftReplyButton) {
+        event.preventDefault();
+
+        const selectedCase =
+          state.cases.find(
+            item => item.id === state.selectedCaseId
+          );
+
+        const ticketId =
+          String(selectedCase?.zohoTicketId || "").trim();
+
+        const guidance =
+          state.aiCaseGuidance.get(ticketId);
+
+        const stepIndex =
+          Number(draftReplyButton.dataset.stepIndex);
+
+        const step =
+          guidance?.nextSteps?.[stepIndex];
+
+        if (
+          !ticketId ||
+          !guidance?.suggestionKey ||
+          !Number.isInteger(stepIndex) ||
+          stepIndex < 0 ||
+          !step?.action
+        ) {
+          showToast(
+            "Unable to find the selected next step. Please refresh the case."
+          );
+          return;
+        }
+
+        const originalText =
+          draftReplyButton.textContent;
+
+        draftReplyButton.disabled = true;
+        draftReplyButton.textContent = "Drafting...";
+
+        try {
+          const response = await fetch(
+            buildApiUrl(
+              appConfig.endpoints.aiDraftReply
+            ),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              body: JSON.stringify({
+                ticketId,
+                suggestionKey: guidance.suggestionKey,
+                caseIdentifier:
+                  guidance.caseIdentifier || "",
+                caseTicketIds:
+                  guidance.caseTicketIds || [ticketId],
+                party: step.party || "",
+                action: step.action,
+                classification:
+                  step.classification || ""
+              })
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `Draft generation failed: HTTP ${response.status}`
+            );
+          }
+
+          const result = await response.json();
+
+          if (
+            result.success !== true ||
+            !result.subject ||
+            !result.body
+          ) {
+            throw new Error(
+              "AI returned an incomplete email draft."
+            );
+          }
+
+          // Store the generated draft temporarily.
+          // We will display it in an editable area next.
+          state.currentEmailDraft = {
+            ...result,
+            caseId: selectedCase.id,
+            stepIndex
+          };
+
+          // Show the draft under the selected next step.
+          const draftContainer =
+            document.createElement("div");
+
+          draftContainer.className = "ai-email-draft";
+
+          draftContainer.innerHTML = `
+  <div style="font-weight: 700; margin-bottom: 10px;">
+    AI Email Draft
+  </div>
+
+  <label style="display: block; margin-bottom: 5px;">
+    Subject
+  </label>
+  <input
+    class="ai-draft-subject"
+    type="text"
+    style="width: 100%; margin-bottom: 12px; padding: 8px;"
+  >
+
+  <label style="display: block; margin-bottom: 5px;">
+    Email Body
+  </label>
+  <textarea
+    class="ai-draft-body"
+    rows="12"
+    style="width: 100%; padding: 8px; resize: vertical;"
+  ></textarea>
+
+  <button
+    type="button"
+    class="media-view-button ai-draft-copy"
+    style="margin-top: 10px;"
+  >
+    Copy Email
+  </button>
+`;
+
+          draftContainer.querySelector(".ai-draft-subject").value =
+            result.subject;
+
+          draftContainer.querySelector(".ai-draft-body").value =
+            result.body;
+
+          // Remove any previously generated draft for this step.
+          const existingDraft =
+            draftReplyButton.parentElement.querySelector(
+              ".ai-email-draft"
+            );
+
+          if (existingDraft) {
+            existingDraft.remove();
+          }
+
+          draftReplyButton.parentElement.appendChild(draftContainer);
+
+          draftContainer.querySelector(".ai-draft-copy")
+            .addEventListener("click", async () => {
+              const subject =
+                draftContainer.querySelector(".ai-draft-subject").value;
+
+              const body =
+                draftContainer.querySelector(".ai-draft-body").value;
+
+              try {
+                await navigator.clipboard.writeText(
+                  `Subject: ${subject}\n\n${body}`
+                );
+
+                showToast("Email copied to clipboard.");
+              } catch (error) {
+                showToast("Unable to copy email.");
+              }
+            });
+
+          showToast(
+            "Email draft generated successfully."
+          );
+
+          console.log(
+            "Generated AI email draft:",
+            result
+          );
+
+        } catch (error) {
+          console.error(
+            "Draft Reply generation failed:",
+            error
+          );
+
+          showToast(
+            "Unable to generate email draft."
+          );
+
+        } finally {
+          draftReplyButton.disabled = false;
+          draftReplyButton.textContent = originalText;
         }
 
         return;
