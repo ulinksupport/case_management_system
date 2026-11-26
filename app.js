@@ -8080,20 +8080,6 @@ function renderAiCaseGuidance(caseItem) {
     </div>
 
 
-    ${confirmationsHtml}
-
-
-    <div class="ai-section">
-      <div class="ai-label">
-        Suggested Replies
-      </div>
-
-      <div class="ai-guidance-list">
-        ${repliesHtml}
-      </div>
-    </div>
-
-
     <div class="ai-guidance-meta">
       ${escapeHtml(sourceLabel)}
       ${generatedAt
