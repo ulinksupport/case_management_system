@@ -1363,10 +1363,13 @@ async function loadChildCasesOnDemand() {
   } finally {
     state.childCasesLoading = false;
 
+    renderKpis();
+
     if (state.relationshipFilter === "Child") {
       renderCaseTable();
     }
   }
+
 }
 
 async function fetchVeloxTranscripts() {
@@ -2431,42 +2434,57 @@ function renderDataSourceStatus() {
     : "Dummy Data";
 }
 
+
 function renderKpis() {
-  const dashboardCases = state.cases.filter(item =>
+  const primaryTickets = state.cases.filter(item =>
     String(item.associatedType || "")
       .trim()
       .toLowerCase() !== "child"
   );
 
-  const openCases = dashboardCases.filter(
-    item => item.status === "Open"
+  const isOpen = item =>
+    String(item.status || "")
+      .trim()
+      .toLowerCase() === "open";
+
+  const parentCount = primaryTickets.filter(item =>
+    isOpen(item) &&
+    String(item.associatedType || "")
+      .trim()
+      .toLowerCase() === "parent"
   ).length;
 
-  const interactionCount = dashboardCases.reduce(
-    (sum, item) => sum + item.interactions.length,
-    0
-  );
+  const unlinkedCount = primaryTickets.filter(item =>
+    isOpen(item) &&
+    !String(item.associatedType || "").trim()
+  ).length;
 
-  const ticketCount = dashboardCases.reduce(
-    (sum, item) => sum + item.tickets.length,
-    0
-  );
-
+  // Child tickets load only when the Child tab is opened.
+  const childCount = state.childCasesLoaded
+    ? state.childCases.filter(isOpen).length
+    : "—";
 
   const cards = [
     {
-      label: "Open Master Cases",
-      value: openCases,
-      foot: `Across ${ticketCount} linked tickets`
+      label: "Open Parent Tickets",
+      value: parentCount,
+      foot: "Zoho Parent tickets"
     },
     {
-      label: "Visible Interactions",
-      value: interactionCount,
-      foot: "Email · WhatsApp · Documents"
+      label: "Open Child Tickets",
+      value: childCount,
+      foot: state.childCasesLoaded
+        ? "Zoho Child tickets"
+        : "Count available after Child tickets load"
+    },
+    {
+      label: "Open Unlinked Tickets",
+      value: unlinkedCount,
+      foot: "Tickets without Parent/Child association"
     }
   ];
 
-  elements.kpiGrid.innerHTML = cards.map((card) => `
+  elements.kpiGrid.innerHTML = cards.map(card => `
     <div class="card kpi-card">
       <div class="kpi-label">${escapeHtml(card.label)}</div>
       <div class="kpi-value">${escapeHtml(card.value)}</div>
@@ -2690,12 +2708,9 @@ function renderCaseTable() {
 
         (
           relationship === "Parent" &&
-          (
-            item.associatedType === "Parent" ||
-            !String(
-              item.associatedType ?? ""
-            ).trim()
-          )
+          String(item.associatedType || "")
+            .trim()
+            .toLowerCase() === "parent"
         ) ||
 
         (
@@ -11042,10 +11057,19 @@ async function initializeDashboard() {
     state.whatsappLoading = true;
     renderWhatsappTable();
 
-    await refreshDashboardData();
 
-    await refreshVeloxData();
+    // Start all dashboard data requests independently.
+    const zohoLoad = refreshDashboardData();
+
+    refreshVeloxData();
     loadWhatsappConversations();
+
+    // Preload Child and Unreplied tickets automatically.
+    loadChildCasesOnDemand();
+    loadUnrepliedCasesOnDemand();
+
+    // Wait for Zoho before restoring a previously opened case.
+    await zohoLoad;
 
     const params =
       new URLSearchParams(
